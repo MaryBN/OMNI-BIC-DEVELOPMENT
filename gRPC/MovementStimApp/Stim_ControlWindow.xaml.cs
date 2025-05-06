@@ -23,6 +23,7 @@ namespace MovementStimAPP
     /// </summary>
     public partial class Stim_ControlWindow : Window
     {
+        private BICManager aBICManager;
         private EMGLib.Delsys_Connection baseConnection = new EMGLib.Delsys_Connection();
         private EMGLib.EMG_Streaming emgStreaming = new EMGLib.EMG_Streaming();
         public CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
