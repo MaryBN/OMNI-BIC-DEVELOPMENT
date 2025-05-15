@@ -29,7 +29,9 @@ namespace MovementStimAPP
         // Logging Objects
         FileStream logFileStream;
         StreamWriter logFileWriter;
-        string filePath = "./filterLog" + DateTime.Now.ToString("_MMddyyyy_HHmmss") + ".csv";
+        string fileName = @"\filterLog_" + $"{DateTime.Now:yyyy - MM - dd_HH - mm - ss}" + ".csv";
+        public string saveDir;
+        string filePath;
         ConcurrentQueue<string> logLineQueue = new ConcurrentQueue<string>();
         Thread newLoggingThread;
         bool loggingNotDisposed = true;
@@ -40,9 +42,31 @@ namespace MovementStimAPP
         // Task pointers for streaming methods
         private Task neuroMonitor = null;
 
-        // Constructor
-        public BICManager(int definedDataBufferLength)
+        public Configuration configInfo;
+        public class Configuration
         {
+            public string stimType { get; set; }
+            public bool monopolar { get; set; }
+            public int senseChannel { get; set; }
+            public int stimChannel { get; set; }
+            public int returnChannel { get; set; }
+            public uint stimPeriod { get; set; }
+            public int stimAmplitude { get; set; }
+            public uint stimDuration { get; set; }
+            public double stimThreshold { get; set; }
+            public List<double> filterCoefficients_B { get; set; }
+            public List<double> filterCoefficients_A { get; set; }
+            //public double triggerPhase { get; set; }
+            //public double targetPhase { get; set; }
+        }
+
+        // Constructor
+        public BICManager() { }
+    
+
+        public void Initialize(int definedDataBufferLength)
+        {
+            filePath = saveDir + fileName;
             // Open up the GRPC Channel to the BIC microservice
             aGRPChannel = new Channel("127.0.0.1:50051", ChannelCredentials.Insecure);
 
@@ -70,6 +94,7 @@ namespace MovementStimAPP
             }
             logFileWriter.WriteLine("PacketNum, TimeStamp, FilteredChannelNum, RawChannelData, PreFilteredChannelData, HampelFilteredChannelData, " +
                 "FilteredChannelData, boolInterpolated, StimChannelData, StimActive, CalcPhase, TriggerPhase, validTarget, InputTrigger" + chanHeader);
+
         }
         public bool BICConnect()
         {

@@ -15,6 +15,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Windows.Controls.Primitives;
+using System.Xml;
 
 namespace MovementStimAPP
 {
@@ -23,7 +27,7 @@ namespace MovementStimAPP
     /// </summary>
     public partial class Stim_ControlWindow : Window
     {
-        private BICManager aBICManager;
+        private BICManager aBICManager = new BICManager();
         private EMGLib.Delsys_Connection baseConnection = new EMGLib.Delsys_Connection();
         private EMGLib.EMG_Streaming emgStreaming = new EMGLib.EMG_Streaming();
         public CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
@@ -38,8 +42,10 @@ namespace MovementStimAPP
         List<double>[] threshData;
         List<int>[] stimData;
         int numChannels = 16;
+        int bicChannels = 34;
 
         private System.Timers.Timer EMGChartUpdateTimer;
+        private System.Timers.Timer neuroStreamChartUpdateTimer;
 
         private bool calibrating = false;
 
@@ -49,6 +55,7 @@ namespace MovementStimAPP
             public bool IsSelected { get; set; }
         }
         public List<Channel> channelList { get; set; }
+        public List<Channel> bicList { get; set; }
         public List<int> channelNumList { get; set; }
 
         //public float[] maxSig;
@@ -60,10 +67,17 @@ namespace MovementStimAPP
             channelList = new List<Channel>();
             channelNumList = new List<int>();
 
+            bicList = new List<Channel>();
+
             for (int i = 1; i <= numChannels; i++)
             {
                 channelList.Add(new Channel { IsSelected = false, Name = i.ToString() });
                 channelNumList.Add(i);
+            }
+
+            for (int i = 1; i <=bicChannels; i++)
+            {
+                bicList.Add(new Channel { IsSelected = false, Name=i.ToString() });
             }
             this.DataContext = this;
 
@@ -127,15 +141,16 @@ namespace MovementStimAPP
             btn_connect.IsEnabled = false;
             btn_startStim.IsEnabled = false;
             btn_stopStim.IsEnabled = false;
+            btn_bicConfigLoad.IsEnabled = false;
 
             string seriesName;
 
-            EMGStreamChart.ChartAreas[0].AxisX.Title = "Time (ns)";
-            EMGStreamChart.ChartAreas[0].AxisY.Title = "Raw EMG signal (V)";
+            //EMGStreamChart.ChartAreas[0].AxisX.Title = "Time (ns)";
+            //EMGStreamChart.ChartAreas[0].AxisY.Title = "Raw EMG signal (V)";
 
-            EMGStreamChart.ChartAreas[0].AxisY.Minimum = -0.1e-3;
-            EMGStreamChart.ChartAreas[0].AxisY.Maximum = 0.1e-3;
-            EMGStreamChart.Series.Clear();
+            //EMGStreamChart.ChartAreas[0].AxisY.Minimum = -0.1e-3;
+            //EMGStreamChart.ChartAreas[0].AxisY.Maximum = 0.1e-3;
+            //EMGStreamChart.Series.Clear();
 
             FiltEMGStreamChart.ChartAreas[0].AxisX.Title = "Time (ns)";
             FiltEMGStreamChart.ChartAreas[0].AxisY.Title = "Filt EMG signal (V)";
@@ -147,13 +162,13 @@ namespace MovementStimAPP
             for (int i = 1; i <= numChannels; i++)
             {
                 seriesName = "EMG " + i.ToString();
-                EMGStreamChart.Series.Add(
-                new System.Windows.Forms.DataVisualization.Charting.Series
-                {
-                    Name = seriesName,
-                    Color = colors_list[i - 1],
-                    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
-                });
+                //EMGStreamChart.Series.Add(
+                //new System.Windows.Forms.DataVisualization.Charting.Series
+                //{
+                //    Name = seriesName,
+                //    Color = colors_list[i - 1],
+                //    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
+                //});
 
                 FiltEMGStreamChart.Series.Add(
                 new System.Windows.Forms.DataVisualization.Charting.Series
@@ -174,13 +189,13 @@ namespace MovementStimAPP
                 for (int i = 1; i <= numChannels; i++)
                 {
                     seriesName = "Thresh " + i.ToString();
-                    EMGStreamChart.Series.Add(
-                    new System.Windows.Forms.DataVisualization.Charting.Series
-                    {
-                        Name = seriesName,
-                        Color = colors_list[i - 1],
-                        ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
-                    });
+                    //EMGStreamChart.Series.Add(
+                    //new System.Windows.Forms.DataVisualization.Charting.Series
+                    //{
+                    //    Name = seriesName,
+                    //    Color = colors_list[i - 1],
+                    //    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
+                    //});
 
                     FiltEMGStreamChart.Series.Add(
                     new System.Windows.Forms.DataVisualization.Charting.Series
@@ -198,13 +213,13 @@ namespace MovementStimAPP
                 for (int i = 1; i <= numChannels; i++)
                 {
                     seriesName = "Stim " + i.ToString();
-                    EMGStreamChart.Series.Add(
-                    new System.Windows.Forms.DataVisualization.Charting.Series
-                    {
-                        Name = seriesName,
-                        Color = colors_list[i - 1],
-                        ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
-                    });
+                    //EMGStreamChart.Series.Add(
+                    //new System.Windows.Forms.DataVisualization.Charting.Series
+                    //{
+                    //    Name = seriesName,
+                    //    Color = colors_list[i - 1],
+                    //    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
+                    //});
 
                     FiltEMGStreamChart.Series.Add(
                     new System.Windows.Forms.DataVisualization.Charting.Series
@@ -222,10 +237,41 @@ namespace MovementStimAPP
                 }
                 
             }
-            for (int i = 0; i < EMGStreamChart.Series.Count; i++)
+            for (int i = 0; i < FiltEMGStreamChart.Series.Count; i++)
             {
-                EMGStreamChart.Series[i].IsVisibleInLegend = false;
+                //EMGStreamChart.Series[i].IsVisibleInLegend = false;
                 FiltEMGStreamChart.Series[i].IsVisibleInLegend = false;
+            }
+
+            if (!calibrating)
+            {
+                neuroStreamChart.ChartAreas[0].AxisX.Title = "Time (ns)";
+                neuroStreamChart.ChartAreas[0].AxisY.Title = "BIC signal (V)";
+
+                neuroStreamChart.ChartAreas[0].AxisY.Minimum = -0.1e-3;
+                neuroStreamChart.ChartAreas[0].AxisY.Maximum = 0.1e-3;
+                neuroStreamChart.Series.Clear();
+                for (int i = 1; i < bicChannels; i++)
+                {
+                    if (i == 33)
+                    {
+                        seriesName = "Filtered Channel";
+                    }
+                    else
+                    {
+                        seriesName = "Channel " + i.ToString();
+                    }
+                    neuroStreamChart.Series.Add(
+                    new System.Windows.Forms.DataVisualization.Charting.Series
+                    {
+                        Name = seriesName,
+                        Color = colors_list[i - 1],
+                        ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
+                    });
+
+                    // when loading window, make legend invisible
+                    neuroStreamChart.Series[i - 1].IsVisibleInLegend = false;
+                }
             }
 
         }
@@ -263,19 +309,19 @@ namespace MovementStimAPP
                 chanString = "EMG " + selectedChannels[i].ToString();
                 var emgRaw_output = emgRawData.Select(row => row[selectedChannels[i] - 1]).ToList();
 
-                try
-                {
+                //try
+                //{
 
-                    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    delegate
-                    {
-                        EMGStreamChart.Series[chanString].Points.DataBindY(emgRaw_output);
-                    }));
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Chart threw an exception: " + ex.Message);
-                }
+                //    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                //    delegate
+                //    {
+                //        EMGStreamChart.Series[chanString].Points.DataBindY(emgRaw_output);
+                //    }));
+                //}
+                //catch (Exception ex)
+                //{
+                //    Console.WriteLine("Chart threw an exception: " + ex.Message);
+                //}
                 var emgFilt_output = emgFiltData.Select(row => row[selectedChannels[i] - 1]).ToList();
                 try
                 {
@@ -298,19 +344,19 @@ namespace MovementStimAPP
                     chanString = "Thresh " + selectedChannels[i].ToString();
                     var thresh_output = threshData.Select(row => row[selectedChannels[i] - 1]).ToList();
 
-                    try
-                    {
+                    //try
+                    //{
 
-                        EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                        delegate
-                        {
-                            EMGStreamChart.Series[chanString].Points.DataBindY(thresh_output);
-                        }));
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("Chart threw an exception: " + ex.Message);
-                    }
+                    //    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    //    delegate
+                    //    {
+                    //        EMGStreamChart.Series[chanString].Points.DataBindY(thresh_output);
+                    //    }));
+                    //}
+                    //catch (Exception ex)
+                    //{
+                    //    Console.WriteLine("Chart threw an exception: " + ex.Message);
+                    //}
                     try
                     {
 
@@ -329,19 +375,19 @@ namespace MovementStimAPP
                     chanString = "Stim " + selectedChannels[i].ToString();
                     var stim_output = stimData.Select(row => row[selectedChannels[i] - 1]).ToList();
 
-                    try
-                    {
+                    //try
+                    //{
 
-                        EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                        delegate
-                        {
-                            EMGStreamChart.Series[chanString].Points.DataBindY(stim_output);
-                        }));
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine("Chart threw an exception: " + ex.Message);
-                    }
+                    //    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    //    delegate
+                    //    {
+                    //        EMGStreamChart.Series[chanString].Points.DataBindY(stim_output);
+                    //    }));
+                    //}
+                    //catch (Exception ex)
+                    //{
+                    //    Console.WriteLine("Chart threw an exception: " + ex.Message);
+                    //}
                     emgFilt_output = emgFiltData.Select(row => row[selectedChannels[i] - 1]).ToList();
                     try
                     {
@@ -361,8 +407,60 @@ namespace MovementStimAPP
             }
 
         }
+        
+        private void neuroChartUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            // grab latest data
+            List<double>[] neuroData = aBICManager.getData();
+
+            // look for the selected items in the listbox
+            List<int> selectedChannels = new List<int>();
+            string chanString = "";
+            int chanVal;
+            bool valConvert = false;
+
+            // get a list of selected channels
+            var selected = from item in channelList
+                           where item.IsSelected == true
+                           select item.Name.ToString();
+
+            // convert from string to int type
+            foreach (String item in selected)
+            {
+                valConvert = Int32.TryParse(item, out chanVal);
+                if (valConvert)
+                {
+                    selectedChannels.Add(chanVal);
+                }
+                else
+                {
+                    selectedChannels.Add(33);
+                }
+            }
+
+            // update plot with newest data for selected channels
+            for (int i = 0; i < selectedChannels.Count; i++)
+            {
+                if (selectedChannels[i] == 33)
+                {
+                    chanString = "Filtered Channel";
+                }
+                else
+                {
+                    chanString = "Channel " + selectedChannels[i].ToString();
+                }
+                neuroStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                delegate
+                {
+                    neuroStreamChart.Series[chanString].Points.DataBindY(neuroData[selectedChannels[i] - 1]);
+                }));
+            }
+        }
+
         private void calibration_Checked(object sender, EventArgs e)
         {
+            btn_bicConfigLoad.IsEnabled = false;
+            bicCheckBox.IsEnabled = false;
             btn_load.IsEnabled = false;
             btn_threshSave.IsEnabled = false;
             btn_startStim.IsEnabled = false;
@@ -372,6 +470,8 @@ namespace MovementStimAPP
         }
         private void calibration_Unchecked(object sender, EventArgs e)
         {
+            btn_bicConfigLoad.IsEnabled = true;
+            bicCheckBox.IsEnabled = true;
             btn_load.IsEnabled = true;
             btn_threshSave.IsEnabled = true;
             btn_startStim.IsEnabled = false;
@@ -465,6 +565,10 @@ namespace MovementStimAPP
 
         private void btn_start_Click(object sender, RoutedEventArgs e)
         {
+            // connect to BIC
+            aBICManager.Initialize(1000);
+            aBICManager.BICConnect();
+
             // create/recreate threads
             emgStreaming.emgDataPort_Connect();
             emgThread = new Thread(() => emgStreaming.StreamEMG(cancellationTokenSource.Token));
@@ -491,6 +595,12 @@ namespace MovementStimAPP
             EMGChartUpdateTimer = new System.Timers.Timer(200);
             EMGChartUpdateTimer.Elapsed += EMGChartUpdateTimer_Elapsed;
             EMGChartUpdateTimer.Start();
+            if (!calibrating)
+            {
+                neuroStreamChartUpdateTimer = new System.Timers.Timer(200);
+                neuroStreamChartUpdateTimer.Elapsed += neuroChartUpdateTimer_Elapsed;
+                neuroStreamChartUpdateTimer.Start();
+            }
         }
 
 
@@ -512,15 +622,17 @@ namespace MovementStimAPP
         private void btn_saveDir_Click(object sender, RoutedEventArgs e)
         {
             saveDir = saveDir_textbox.Text;
+            aBICManager.saveDir = saveDir;
             //EMGLib.EMG_Streaming emgStreaming = new EMGLib.EMG_Streaming(saveDir);
 
+            btn_bicConfigLoad.IsEnabled = true;
             btn_saveDirProvided.IsEnabled = false;
             btn_start.IsEnabled = false;
             btn_connect.IsEnabled = true;
             btn_startStim.IsEnabled = false;
             btn_stopStim.IsEnabled = false;
         }
-        private void CheckBox_Changed(object sender, RoutedEventArgs e)
+        private void emgCheckBox_Changed(object sender, RoutedEventArgs e)
         {
             // look for the selected items in the listbox
             List<int> selectedChannels = new List<int>();
@@ -541,15 +653,15 @@ namespace MovementStimAPP
             }
 
             // reset current legend
-            EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-            delegate
-            {
-                foreach (var series in EMGStreamChart.Series)
-                {
-                    series.IsVisibleInLegend = false;
-                    series.Enabled = false;
-                }
-            }));
+            //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+            //delegate
+            //{
+            //    foreach (var series in EMGStreamChart.Series)
+            //    {
+            //        series.IsVisibleInLegend = false;
+            //        series.Enabled = false;
+            //    }
+            //}));
 
             FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
             delegate
@@ -567,12 +679,12 @@ namespace MovementStimAPP
             {
                 chanString = "EMG " + selectedChannels[i].ToString();
                 
-                EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                delegate
-                {
-                    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                    EMGStreamChart.Series[chanString].Enabled = true;
-                }));
+                //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                //delegate
+                //{
+                //    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                //    EMGStreamChart.Series[chanString].Enabled = true;
+                //}));
                 FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
                 delegate
                 {
@@ -584,12 +696,12 @@ namespace MovementStimAPP
                 {
                     // add threshold to legend for each selected channel
                     chanString = "Thresh " + selectedChannels[i].ToString();
-                    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    delegate
-                    {
-                    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                    EMGStreamChart.Series[chanString].Enabled = true;
-                    }));
+                    //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    //delegate
+                    //{
+                    //EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                    //EMGStreamChart.Series[chanString].Enabled = true;
+                    //}));
                     FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
                     delegate
                     {
@@ -599,12 +711,12 @@ namespace MovementStimAPP
 
                     // add stim occurrance to legend for each selected channel
                     chanString = "Stim " + selectedChannels[i].ToString();
-                    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    delegate
-                    {
-                        EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                        EMGStreamChart.Series[chanString].Enabled = true;
-                    }));
+                    //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    //delegate
+                    //{
+                    //    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                    //    EMGStreamChart.Series[chanString].Enabled = true;
+                    //}));
                     FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
                     delegate
                     {
@@ -635,11 +747,96 @@ namespace MovementStimAPP
                 //    }
                 //}
             }
-            
+
 
         }
 
+        private void bicCheckBox_Changed(object sender, EventArgs e)
+        {
+            // look for the selected items in the listbox
+            List<int> selectedChannels = new List<int>();
+            string chanString = "";
+            int chanVal;
+            bool valConvert = false;
 
+            // get a list of selected channels
+            var selected = from item in bicList
+                           where item.IsSelected == true
+                           select item.Name.ToString();
+
+            // convert from string to int type
+            foreach (String item in selected)
+            {
+                valConvert = Int32.TryParse(item, out chanVal);
+                if (valConvert)
+                {
+                    selectedChannels.Add(chanVal);
+                }
+                else
+                {
+                    selectedChannels.Add(33);
+                }
+            }
+
+            // reset current legend
+            neuroStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+            delegate
+            {
+                foreach (var series in neuroStreamChart.Series)
+                {
+                    series.IsVisibleInLegend = false;
+                    series.Enabled = false;
+                }
+            }));
+
+            // update legend for newest selection of channels
+            for (int i = 0; i < selectedChannels.Count; i++)
+            {
+                if (selectedChannels[i] == 33)
+                {
+                    chanString = "Filtered Channel";
+                }
+                else
+                {
+                    chanString = "Channel " + selectedChannels[i].ToString();
+                }
+                neuroStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                delegate
+                {
+                    neuroStreamChart.Series[chanString].IsVisibleInLegend = true;
+                    neuroStreamChart.Series[chanString].Enabled = true;
+                }));
+            }
+        }
+        private void btn_bicConfigLoad_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // open dialog box to select file with patient-specific settings
+                var fileD = new Microsoft.Win32.OpenFileDialog();
+                bool? loadFile = fileD.ShowDialog();
+                if (loadFile == true)
+                {
+                    string fileName = fileD.FileName;
+                    if (File.Exists(fileName))
+                    {
+                        // load in .json file and read in stimulation parameters
+                        using (StreamReader fileReader = new StreamReader(fileName))
+                        {
+                            string configJson = fileReader.ReadToEnd();
+                            aBICManager.configInfo = System.Text.Json.JsonSerializer.Deserialize<BICManager.Configuration>(configJson);
+                            
+                        }
+
+                    }
+                }
+            }
+            catch (Exception theException)
+            {
+                
+                Console.WriteLine(theException.Message);
+            }
+        }
 
     }
 }
