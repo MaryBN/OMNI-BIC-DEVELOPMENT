@@ -279,7 +279,7 @@ namespace MovementStimAPP
         private void EMGChartUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             // grab latest data and corresponding timestamp
-            emgRawData = emgStreaming.getRawData();
+            //emgRawData = emgStreaming.getRawData();
             emgFiltData = emgStreaming.getFiltData();
             if (!calibrating)
             {

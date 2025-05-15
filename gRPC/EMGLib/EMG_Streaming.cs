@@ -224,7 +224,7 @@ namespace EMGLib
                         {
                             (int[] movementDetected, long[] movementDetectedTimestamp) = _stimMod.trigerStim(_stimMod.rectifySignals(filtSamples), _stimMod.thresh);
 
-                            rawSamplesQueue.Add(emgSamples);
+                            //rawSamplesQueue.Add(emgSamples);
                             filtSamplesQueue.Add(filtSamples);
                             threshSamplesQueue.Add(_stimMod.thresh);
                             stimSamplesQueue.Add(movementDetected);
@@ -332,9 +332,9 @@ namespace EMGLib
                         for (int i = samplesAvailable; i < numSamplesToPlot; i++)
                         {
                             // add rawData[samplesAvailable-numSamplesToPlot]
-                            float[] raw = rawSamplesQueue.Take();
+                            //float[] raw = rawSamplesQueue.Take();
                             float[] filt = filtSamplesQueue.Take();
-                            rawData[i] = new List<float>(raw);
+                            //rawData[i] = new List<float>(raw);
                             filtData[i] = new List<float>(filt);
                             if (!calibrationOn)
                             {
@@ -351,7 +351,7 @@ namespace EMGLib
                         {
                             float[] raw = rawSamplesQueue.Take();
                             float[] filt = filtSamplesQueue.Take();
-                            rawData[i] = new List<float>(raw);
+                            //rawData[i] = new List<float>(raw);
                             filtData[i] = new List<float>(filt);
                             if (!calibrationOn)
                             {
@@ -363,7 +363,7 @@ namespace EMGLib
                         }
                     }
                 }
-                plotRawDataQueue.Add(rawData);
+                //plotRawDataQueue.Add(rawData);
                 plotFiltDataQueue.Add(filtData);
                 if (!calibrationOn)
                 {
