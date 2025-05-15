@@ -54,6 +54,9 @@ namespace EMGLib
         private BlockingCollection<List<double>[]> plotThreshDataQueue = new BlockingCollection<List<double>[]>();
         private BlockingCollection<List<int>[]> plotStimDataQueue = new BlockingCollection<List<int>[]>();
 
+        public bool _generateStim = false;
+        public bool _stimEnabled = false;
+
         private static long streamStart_timestamp;
 
         // calibration bool, if true stim is disabled, if false stim is enabled
@@ -222,8 +225,11 @@ namespace EMGLib
                         }
                         else
                         {
+                            _stimMod.stimEnabled = _stimEnabled;
+
                             (int[] movementDetected, long[] movementDetectedTimestamp) = _stimMod.trigerStim(_stimMod.rectifySignals(filtSamples), _stimMod.thresh);
 
+                            _generateStim = _stimMod.generateStim;
                             //rawSamplesQueue.Add(emgSamples);
                             filtSamplesQueue.Add(filtSamples);
                             threshSamplesQueue.Add(_stimMod.thresh);

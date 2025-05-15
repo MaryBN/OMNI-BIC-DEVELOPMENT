@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -9,7 +10,8 @@ namespace EMGLib
 {
     public class Stim_Modules
     {
-        public bool stimulating = false;
+        public bool stimEnabled = false;
+        public bool generateStim = false;
         public float percent;
         int numberOfChannels;
 
@@ -54,15 +56,26 @@ namespace EMGLib
             {
                 if (signal[ch] >= thresh[ch] & signal[ch] != 0)
                 {
-                    stimulating = true;
                     // timestamp for when signal above threshold was detected
                     movementDetectedTimestamp[ch] = DateTime.Now.Ticks;
                     stimulate[ch] = 1;
+
+                    if (stimEnabled)
+                    {
+                        generateStim = true;
+                    }
+                    else
+                    {
+                        generateStim = false;
+                    }
+                    
                 }
                 else
                 {
                     movementDetectedTimestamp[ch] = DateTime.Now.Ticks;
                     stimulate[ch] = 0;
+
+                    generateStim = false;
                 }
             }
             

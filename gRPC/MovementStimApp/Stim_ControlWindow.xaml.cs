@@ -36,6 +36,8 @@ namespace MovementStimAPP
         Thread unpackEMGstreamThread;
         Thread plotThread;
 
+        Thread startStimThread;
+
         string saveDir;
         List<float>[] emgRawData;
         List<float>[] emgFiltData;
@@ -88,6 +90,8 @@ namespace MovementStimAPP
             // Sasha says: probably this timer is already stopped, since
             // the object is null error indicates the garbage collector
             // has already freed it.
+            aBICManager.Dispose();
+
             EMGChartUpdateTimer.Stop();
             cancellationTokenSource.Cancel();
             emgStreaming.emgDataPort_Diconnect();
@@ -539,12 +543,17 @@ namespace MovementStimAPP
 
         private void btn_startStim_Click(object sender, EventArgs e)
         {
+            startStimThread = new Thread(() => Stimulator() );
+            startStimThread.Start();
+            emgStreaming._stimEnabled = true;
             btn_stopStim.IsEnabled = true;
             btn_startStim.IsEnabled = false;
         }
 
         private void btn_stopStim_Click(Object sender, EventArgs e)
         {
+            startStimThread.Abort();
+            emgStreaming._stimEnabled = false;
             btn_stopStim.IsEnabled = false;
             btn_startStim.IsEnabled = true;
             btn_threshSave.IsEnabled = true;
@@ -835,6 +844,49 @@ namespace MovementStimAPP
             {
                 
                 Console.WriteLine(theException.Message);
+            }
+        }
+
+        private void Stimulator()
+        {
+            //bool stimulated = false;
+            var configInfo = aBICManager.configInfo;
+            while (true)
+            {
+                if (emgStreaming._stimEnabled)
+                {
+                    if (emgStreaming._generateStim)
+                    {
+                        try
+                        {
+                            aBICManager.enableOpenLoopStimulation(true, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 4, configInfo.stimPeriod - (5 * configInfo.stimDuration) - 3500, configInfo.stimThreshold);
+                            Console.WriteLine("OL enabled");
+                        }
+                        catch
+                        {
+                            // Exception occured, gRPC command did not succeed, do not update UI button elements
+                            Console.WriteLine("Open loop stimulation NOT started: load new configuration\n");
+                                
+                            return;
+                        }
+
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        aBICManager.enableOpenLoopStimulation(false, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 1, 20000, configInfo.stimThreshold);
+                        Console.WriteLine("OL disables");
+                    }
+                    catch
+                    {
+                        // Exception occured, gRPC command did not succeed, do not update UI button elements
+                        Console.WriteLine("Open loop stimulation NOT stopped: load new configuration\n");
+
+                        return;
+                    }
+                }
             }
         }
 
