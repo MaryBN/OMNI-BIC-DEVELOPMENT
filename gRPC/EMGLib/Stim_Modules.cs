@@ -52,6 +52,7 @@ namespace EMGLib
             // movement not detected = 0, movement detected = 1
             int[] stimulate = new int[thresh.Length];
             long[] movementDetectedTimestamp = new long[thresh.Length];
+            generateStim = false;
             for (int ch = 0; ch < thresh.Length; ch++)
             {
                 if (signal[ch] >= thresh[ch] & signal[ch] != 0)
@@ -60,14 +61,7 @@ namespace EMGLib
                     movementDetectedTimestamp[ch] = DateTime.Now.Ticks;
                     stimulate[ch] = 1;
 
-                    if (stimEnabled)
-                    {
-                        generateStim = true;
-                    }
-                    else
-                    {
-                        generateStim = false;
-                    }
+                    generateStim = true;
                     
                 }
                 else
@@ -75,7 +69,6 @@ namespace EMGLib
                     movementDetectedTimestamp[ch] = DateTime.Now.Ticks;
                     stimulate[ch] = 0;
 
-                    generateStim = false;
                 }
             }
             
