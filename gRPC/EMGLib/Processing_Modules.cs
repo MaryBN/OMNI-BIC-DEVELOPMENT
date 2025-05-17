@@ -14,34 +14,51 @@ namespace EMGLib
     public partial class Processing_Modules
     {
         private int numChannels;
-        private List<float>[] prevInput; // initial previous inputs (zero-padding)
-        private List<float>[] prevFiltOut; // initial previous outputs (zero-padding)
+
+        // IIR filter values \\
+        private List<float>[] band_prevInput; // initial previous inputs (zero-padding)
+        private List<float>[] band_prevFiltOut; // initial previous outputs (zero-padding)
 
         // Filter coefficients: **currently copied from bandpass butterworth from python**
-        private List<float> b = new List<float> { 0.231f, 0f, -0.4626f, 0f, 0.231f }; // numerator coefficients
-        private List<float> a = new List<float> { 1f, -2.14f, 1.553f, -0.592f, 0.1834f }; // denominator coefficients
-        private float gainVal = 0.2313f;
+        private List<float> band_b = new List<float> { 0.231f, 0f, -0.4626f, 0f, 0.231f }; // numerator coefficients
+        private List<float> band_a = new List<float> { 1f, -2.14f, 1.553f, -0.592f, 0.1834f }; // denominator coefficients
+        private float band_gainVal = 0.2313f;
 
-        
+        // lowpass filter/evelope values \\
+        private List<float>[] low_prevInput; // initial previous inputs (zero-padding)
+        private List<float>[] low_prevFiltOut; // initial previous outputs (zero-padding)
+
+        // Filter coefficients: **currently copied from bandpass butterworth from python**
+        private List<float> low_b = new List<float> { 0.0591907f, 0.0591907f }; // numerator coefficients
+        private List<float> low_a = new List<float> { 1f, -0.88161859f }; // denominator coefficients
+        private float low_gainVal = 0.059190703818405445f;
 
         public Processing_Modules(int channels)
         {
             numChannels = channels;
-            prevInput = new List<float>[numChannels];
-            prevFiltOut = new List<float>[numChannels];
 
-            
+            band_prevInput = new List<float>[numChannels];
+            band_prevFiltOut = new List<float>[numChannels];
+
+            low_prevInput = new List<float>[numChannels];
+            low_prevFiltOut = new List<float>[numChannels];
+
+
 
             // create input and output array for filter
             for (int i = 0; i < numChannels; i++)
             {
-                prevInput[i] = new List<float> { 0f, 0f, 0f, 0f };
-                prevFiltOut[i] = new List<float> { 0f, 0f, 0f, 0f };
+                band_prevInput[i] = new List<float> { 0f, 0f, 0f, 0f };
+                band_prevFiltOut[i] = new List<float> { 0f, 0f, 0f, 0f };
+
+                low_prevInput[i] = new List<float> { 0f, 0f };
+                low_prevFiltOut[i] = new List<float> { 0f, 0f };
             }
-            
+
         }
         public float[] IIRFilter(float[] currSamp)
         {
+            // this is a band pass filter:
             float[] filtTemp = new float[16];
 
             for (int i = 0; i < 16; i++)
@@ -51,17 +68,41 @@ namespace EMGLib
                 //{
                 //    Console.WriteLine("test");
                 //}
-                filtTemp[i] = (gainVal * b[0] * currSamp[i] + gainVal * b[1] * prevInput[i][0] + gainVal * b[2] * prevInput[i][1] + gainVal * b[3] * prevInput[i][2] + gainVal * b[4] * prevInput[i][3]
-                    - a[1] * prevFiltOut[i][0] - a[2] * prevFiltOut[i][1] - a[3] * prevFiltOut[i][2] - a[4] * prevFiltOut[i][3]);
+                filtTemp[i] = (band_gainVal * band_b[0] * currSamp[i] + band_gainVal * band_b[1] * band_prevInput[i][0] + band_gainVal * band_b[2] * band_prevInput[i][1] + band_gainVal * band_b[3] * band_prevInput[i][2] + band_gainVal * band_b[4] * band_prevInput[i][3]
+                    - band_a[1] * band_prevFiltOut[i][0] - band_a[2] * band_prevFiltOut[i][1] - band_a[3] * band_prevFiltOut[i][2] - band_a[4] * band_prevFiltOut[i][3]);
 
-                prevFiltOut[i].Insert(0, filtTemp[i]);
-                prevFiltOut[i].RemoveAt(prevFiltOut[i].Count - 1);
+                band_prevFiltOut[i].Insert(0, filtTemp[i]);
+                band_prevFiltOut[i].RemoveAt(band_prevFiltOut[i].Count - 1);
 
                 // Store most recent sample at the beginning of history window
-                prevInput[i].Insert(0, currSamp[i]);
-                prevInput[i].RemoveAt(prevInput[i].Count - 1);
+                band_prevInput[i].Insert(0, currSamp[i]);
+                band_prevInput[i].RemoveAt(band_prevInput[i].Count - 1);
             }
 
+
+            return filtTemp;
+        }
+
+        public float[] envelopeSignals(float[] currSamp)
+        {
+            // this is a low pass filter: 
+            // y[n] = (b0 * x[n] + b1 * x[n-1]) / (1 + a1 * y[n-1])
+
+            float[] filtTemp = new float[16];
+            for (int i = 0; i < 16; i++)
+            {
+                //filtTemp[i] = (low_gainVal * low_b[0] * currSamp[i] + low_gainVal * low_b[1] * low_prevInput[i][0] +
+                //    -low_a[1] * low_prevFiltOut[i][0] - low_a[2] * low_prevFiltOut[i][1] - low_a[3] * low_prevFiltOut[i][2] - low_a[4] * low_prevFiltOut[i][3]);
+                filtTemp[i] = (low_b[0] * currSamp[i] + low_b[1] * low_prevInput[i][0]) /
+                              (1 + low_a[1] * low_prevFiltOut[i][0]);
+
+                low_prevFiltOut[i].Insert(0, filtTemp[i]);
+                low_prevFiltOut[i].RemoveAt(low_prevFiltOut[i].Count - 1);
+
+                // Store most recent sample at the beginning of history window
+                low_prevInput[i].Insert(0, currSamp[i]);
+                low_prevInput[i].RemoveAt(low_prevInput[i].Count - 1);
+            }
 
             return filtTemp;
         }

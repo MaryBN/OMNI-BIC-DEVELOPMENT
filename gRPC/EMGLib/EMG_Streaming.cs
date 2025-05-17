@@ -31,7 +31,7 @@ namespace EMGLib
         public bool streamingStatus = false;
 
         StreamWriter emgSW;
-        StreamWriter emgFiltSW;
+        StreamWriter emgEnvelopedSW;
         StreamWriter timestampSW;
 
         // related to streaming
@@ -150,8 +150,11 @@ namespace EMGLib
                 //string filenameFilt = @"\FilteredFormattedEMGData_" + file_extension;
                 stamp_filename = @"\StimTimestamp_" + file_extension;
                 emgSW = new StreamWriter(saveDir + filename);
-                emgSW.WriteLine(string.Join(",", "emg channel", "raw signal", "filt signal", "signal timstamp", "movement detected", "movement detected timestamp", "percent", "threshold"));
+                emgSW.WriteLine(string.Join(",", "emg channel", "raw signal", "filt signal", "signal timstamp"));
                 
+                filename = @"\EnvData_" + file_extension;
+                emgEnvelopedSW = new StreamWriter(saveDir + filename);
+                emgEnvelopedSW.WriteLine(string.Join(",", "emg channel", "enveloped signal", "stim command", "movement detected", "movement detected timestamp", "percent", "threshold"));
             }
             
             
@@ -195,7 +198,7 @@ namespace EMGLib
                     while (indTracker < bufferFormattedData.Count())
                     {
                         float[] filtSamples = new float[numberOfChannels];
-
+                        float[] envelopedSamples = new float[numberOfChannels];
                         // extract value for every channel
                         for (int i = 0; i < numberOfChannels; ++i)
                         {
@@ -207,7 +210,7 @@ namespace EMGLib
                         }
                         // filter data
                         filtSamples = _processingMod.IIRFilter(emgSamples);
-
+                        envelopedSamples = _processingMod.envelopeSignals(_stimMod.rectifySignals(filtSamples));
                         // FILE SAVED FOR CALIBRATION DATA VS STIM DATA ARE DIFFERENT, SINCE CALIBRATION DATA WILL NOT INCLUDE STIM VALUES
                         // ADD CHECK BOX TO UI INDICATE WHETHER CALIBRATION
                         // movement detection
@@ -227,7 +230,7 @@ namespace EMGLib
                         {
                             _stimMod.stimEnabled = _stimEnabled;
 
-                            (int[] movementDetected, long[] movementDetectedTimestamp) = _stimMod.trigerStim(_stimMod.rectifySignals(filtSamples), _stimMod.thresh);
+                            (int[] movementDetected, long[] movementDetectedTimestamp) = _stimMod.trigerStim(envelopedSamples, _stimMod.thresh);
 
                             _generateStim = _stimMod.generateStim;
                             //rawSamplesQueue.Add(emgSamples);
@@ -237,7 +240,8 @@ namespace EMGLib
 
                             for (int i = 0; i < filtSamples.Length; ++i)
                             {
-                                emgSW.WriteLine(string.Join(",", $"{i + 1}", emgSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples, movementDetected[i] , movementDetectedTimestamp[i], _stimMod.percent, _stimMod.thresh[i]));
+                                emgSW.WriteLine(string.Join(",", $"{i + 1}", emgSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples));
+                                emgEnvelopedSW.WriteLine(string.Join(",", $"{i + 1}", envelopedSamples[i].ToString(), _generateStim, movementDetected[i], movementDetectedTimestamp[i], _stimMod.percent, _stimMod.thresh[i]));
                             }
                         }
                         

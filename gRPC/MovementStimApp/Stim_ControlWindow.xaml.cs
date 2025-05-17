@@ -879,8 +879,9 @@ namespace MovementStimAPP
                         {
 
                             aBICManager.enableOpenLoopStimulation(true, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 4, configInfo.stimPeriod - (5 * configInfo.stimDuration) - 3500, configInfo.stimThreshold);
-                            Console.WriteLine("OL enabled");
                             OLstimON = true;
+                            Console.WriteLine("OL enabled, " + OLstimON);
+                            
                         }
                         catch
                         {
@@ -889,6 +890,7 @@ namespace MovementStimAPP
 
                             return;
                         }
+                        Thread.Sleep(20);
                     }
                         
                 }
@@ -899,8 +901,9 @@ namespace MovementStimAPP
                         try
                         {
                             aBICManager.enableOpenLoopStimulation(false, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 1, 20000, configInfo.stimThreshold);
-                            Console.WriteLine("OL disabled");
                             OLstimON = false;
+                            Console.WriteLine("OL enabled, " + OLstimON);
+                            
                         }
                         catch
                         {
@@ -909,22 +912,28 @@ namespace MovementStimAPP
 
                             return;
                         }
+                        Thread.Sleep(20);
                     }
                 }
                 
             }
-            try
+            if (OLstimON)
             {
-                aBICManager.enableOpenLoopStimulation(false, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 1, 20000, configInfo.stimThreshold);
-                Console.WriteLine("OL disables");
-                
-            }
-            catch
-            {
-                // Exception occured, gRPC command did not succeed, do not update UI button elements
-                Console.WriteLine("Open loop stimulation NOT stopped: load new configuration\n");
+                try
+                {
+                    aBICManager.enableOpenLoopStimulation(false, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 1, 20000, configInfo.stimThreshold);
+                    OLstimON = false;
+                    Console.WriteLine("OL enabled, " + OLstimON);
 
-                return;
+                }
+                catch
+                {
+                    // Exception occured, gRPC command did not succeed, do not update UI button elements
+                    Console.WriteLine("Open loop stimulation NOT stopped: load new configuration\n");
+
+                    return;
+                }
+                Thread.Sleep (20);
             }
             OLstimON = false;
         }
