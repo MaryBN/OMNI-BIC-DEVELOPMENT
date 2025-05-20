@@ -593,9 +593,13 @@ namespace MovementStimAPP
 
         private void btn_start_Click(object sender, RoutedEventArgs e)
         {
-            // connect to BIC
-            aBICManager.Initialize(1000);
-            aBICManager.BICConnect();
+            if (!calibrating)
+            {
+                // connect to BIC
+                aBICManager.Initialize(1000);
+                aBICManager.BICConnect();
+            }
+            
 
             // create/recreate threads
             emgStreaming.emgDataPort_Connect();

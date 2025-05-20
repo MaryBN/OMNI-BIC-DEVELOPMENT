@@ -154,7 +154,7 @@ namespace EMGLib
                 
                 filename = @"\EnvData_" + file_extension;
                 emgEnvelopedSW = new StreamWriter(saveDir + filename);
-                emgEnvelopedSW.WriteLine(string.Join(",", "emg channel", "enveloped signal", "stim command", "movement detected", "movement detected timestamp", "percent", "threshold"));
+                emgEnvelopedSW.WriteLine(string.Join(",", "emg channel", "enveloped signal", "start stim", "stim command", "movement detected", "movement detected timestamp", "percent", "threshold"));
             }
             
             
@@ -241,7 +241,7 @@ namespace EMGLib
                             for (int i = 0; i < filtSamples.Length; ++i)
                             {
                                 emgSW.WriteLine(string.Join(",", $"{i + 1}", emgSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples));
-                                emgEnvelopedSW.WriteLine(string.Join(",", $"{i + 1}", envelopedSamples[i].ToString(), _generateStim, movementDetected[i], movementDetectedTimestamp[i], _stimMod.percent, _stimMod.thresh[i]));
+                                emgEnvelopedSW.WriteLine(string.Join(",", $"{i + 1}", envelopedSamples[i].ToString(), _stimEnabled, _generateStim, movementDetected[i], movementDetectedTimestamp[i], _stimMod.percent, _stimMod.thresh[i]));
                             }
                         }
                         
