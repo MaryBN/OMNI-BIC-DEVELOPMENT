@@ -54,6 +54,9 @@ namespace EMGLib
         private BlockingCollection<List<double>[]> plotThreshDataQueue = new BlockingCollection<List<double>[]>();
         private BlockingCollection<List<int>[]> plotStimDataQueue = new BlockingCollection<List<int>[]>();
 
+        public bool _generateStim = false;
+        public bool _stimEnabled = false;
+
         private static long streamStart_timestamp;
 
         // calibration bool, if true stim is disabled, if false stim is enabled
@@ -222,9 +225,12 @@ namespace EMGLib
                         }
                         else
                         {
+                            _stimMod.stimEnabled = _stimEnabled;
+
                             (int[] movementDetected, long[] movementDetectedTimestamp) = _stimMod.trigerStim(_stimMod.rectifySignals(filtSamples), _stimMod.thresh);
 
-                            rawSamplesQueue.Add(emgSamples);
+                            _generateStim = _stimMod.generateStim;
+                            //rawSamplesQueue.Add(emgSamples);
                             filtSamplesQueue.Add(filtSamples);
                             threshSamplesQueue.Add(_stimMod.thresh);
                             stimSamplesQueue.Add(movementDetected);
@@ -332,9 +338,9 @@ namespace EMGLib
                         for (int i = samplesAvailable; i < numSamplesToPlot; i++)
                         {
                             // add rawData[samplesAvailable-numSamplesToPlot]
-                            float[] raw = rawSamplesQueue.Take();
+                            //float[] raw = rawSamplesQueue.Take();
                             float[] filt = filtSamplesQueue.Take();
-                            rawData[i] = new List<float>(raw);
+                            //rawData[i] = new List<float>(raw);
                             filtData[i] = new List<float>(filt);
                             if (!calibrationOn)
                             {
@@ -351,7 +357,7 @@ namespace EMGLib
                         {
                             float[] raw = rawSamplesQueue.Take();
                             float[] filt = filtSamplesQueue.Take();
-                            rawData[i] = new List<float>(raw);
+                            //rawData[i] = new List<float>(raw);
                             filtData[i] = new List<float>(filt);
                             if (!calibrationOn)
                             {
@@ -363,7 +369,7 @@ namespace EMGLib
                         }
                     }
                 }
-                plotRawDataQueue.Add(rawData);
+                //plotRawDataQueue.Add(rawData);
                 plotFiltDataQueue.Add(filtData);
                 if (!calibrationOn)
                 {
