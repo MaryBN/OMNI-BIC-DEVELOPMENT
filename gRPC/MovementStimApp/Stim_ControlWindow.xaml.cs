@@ -593,6 +593,7 @@ namespace MovementStimAPP
             btn_threshSave.IsEnabled = true;
         }
 
+        // TO DO: modify to connect to both delsys and BIC when this is hit -> potentially have separate buttons for the two?
         private void btn_connect_Click(object sender, RoutedEventArgs e)
         {
             baseConnection.Main();
@@ -605,7 +606,7 @@ namespace MovementStimAPP
             btn_stopStim.IsEnabled = false;
         }
 
-
+        // TO DO: modify to start recording when this is hit and add a start stim button
         private void btn_start_Click(object sender, RoutedEventArgs e)
         {
             if (!calibrating)
@@ -618,7 +619,8 @@ namespace MovementStimAPP
 
             // create/recreate threads
             emgStreaming.emgDataPort_Connect();
-            emgThread = new Thread(() => emgStreaming.StreamEMG(cancellationTokenSource.Token));
+            string dateStamp = $"{DateTime.Now:yyyy - MM - dd}";
+            emgThread = new Thread(() => emgStreaming.StreamEMG(cancellationTokenSource.Token, configInfo.save_path, dateStamp));
             unpackEMGstreamThread = new Thread(() => emgStreaming.unpackEMGstream(cancellationTokenSource.Token, 
                                                                                     saveDir, 
                                                                                         calibrating));
