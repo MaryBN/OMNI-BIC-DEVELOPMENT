@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,6 +19,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows.Controls.Primitives;
 using System.Xml;
+using System.Collections.ObjectModel;
 
 namespace MovementStimAPP
 {
@@ -46,6 +47,8 @@ namespace MovementStimAPP
         int numChannels = 16;
         int bicChannels = 34;
 
+        Configuration configInfo;
+
         private System.Timers.Timer EMGChartUpdateTimer;
         private System.Timers.Timer neuroStreamChartUpdateTimer;
 
@@ -56,8 +59,20 @@ namespace MovementStimAPP
             public string Name { get; set; }
             public bool IsSelected { get; set; }
         }
+        public class Participant
+        {
+            public string ID { get; set; }
+            public bool IsSelected { get; set; }
+        }
+        public class Configuration
+        {
+            public List<string> partIDs { get; set; }
+            public string save_path { get; set; }
+        }
+
         public List<Channel> channelList { get; set; }
         public List<Channel> bicList { get; set; }
+        public ObservableCollection<Participant> participantList { get; set; }
         public List<int> channelNumList { get; set; }
 
         //public float[] maxSig;
@@ -942,5 +957,54 @@ namespace MovementStimAPP
             OLstimON = false;
         }
 
+        private void btn_emgConfigLoad_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // open dialog box to select file with patient-specific settings
+                var fileD = new Microsoft.Win32.OpenFileDialog();
+                bool? loadFile = fileD.ShowDialog();
+                if (loadFile == true)
+                {
+                    string fileName = fileD.FileName;
+                    if (File.Exists(fileName))
+                    {
+                        // load in .json file and read in stimulation parameters
+                        using (StreamReader fileReader = new StreamReader(fileName))
+                        {
+                            string configJson = fileReader.ReadToEnd();
+                            configInfo = System.Text.Json.JsonSerializer.Deserialize<Configuration>(configJson);
+                        }
+                    }
+                }
+                participantList.Clear();
+                //taskList.Clear();
+                for (int par = 0; par < configInfo.partIDs.Count; par++)
+                {
+                    participantList.Add(new Participant { IsSelected = false, ID = configInfo.partIDs[par] });
+                }
+                //}
+                //for (int t = 0; t < configInfo.taskIDs.Count; t++)
+                //{
+                //    taskList.Add(new Task { IsSelected = false, Content = configInfo.taskIDs[t] });
+                //}
+                //taskHandler.IsEnabled = true;
+                //partSelect.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Load Config threw and exception: " + ex.ToString());
+            }
+        }
+        private void part_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var selectedPart = e.AddedItems[0];
+            var part = selectedPart as Participant;
+            if (part != null)
+            {
+                btn_connect.IsEnabled = true;
+                emgStreaming.currPart = part.ID;
+            }
+        }
     }
 }
