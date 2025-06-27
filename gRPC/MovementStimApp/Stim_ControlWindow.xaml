@@ -8,10 +8,14 @@
         mc:Ignorable="d"
         Title="ControlWindow" Height="900" Width="1500" Loaded="ControlWindow_Loaded" Closed="ControlWindow_Closed">
     <Grid>
-        <Button x:Name="btn_emgConfigLoad" Click="btn_emgConfigLoad_Click" Content="Load EMG Config File" HorizontalAlignment="Left" Height="34" Margin="31,26,0,0" VerticalAlignment="Top" Width="178"/>
-        <TextBlock HorizontalAlignment="Left" Height="18" Margin="242,15,0,0" TextWrapping="Wrap" Text="Select Participant ID" VerticalAlignment="Top" Width="154" TextAlignment="Center"/>
-        <ComboBox x:Name="partSelect" ItemsSource="{Binding Path=participantList}" SelectionChanged="part_SelectionChanged" HorizontalAlignment="Left" Height="25
-          " Margin="230,33,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False">
+        <Button x:Name="btn_emgConfigLoad" Click="btn_emgConfigLoad_Click" Content="Load EMG Config File" HorizontalAlignment="Left" Height="34" Margin="52,31,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button x:Name="btn_bicConfigLoad" Click="btn_bicConfigLoad_Click" Content="Load BIC Config File" HorizontalAlignment="Left" Height="34" Margin="248,31,0,0" VerticalAlignment="Top" Width="178"/>
+
+        <CheckBox x:Name="calibration_checkbox" Content="Calibration" Checked="calibration_Checked" Unchecked="calibration_Unchecked" HorizontalAlignment="Left" IsEnabled="True" Height="32" Margin="98,71,0,0" VerticalAlignment="Top" Width="86"/>
+        <Button x:Name="btn_loadCalib" Content="Load Calibration Data" Click="btn_loadCalib_Click" HorizontalAlignment="Left" Height="23" Margin="52,92,0,0" VerticalAlignment="Top" Width="178"/>
+
+        <TextBlock HorizontalAlignment="Left" Height="18" Margin="260,70,0,0" TextWrapping="Wrap" Text="Select Participant ID" VerticalAlignment="Top" Width="154" TextAlignment="Center"/>
+        <ComboBox x:Name="partSelect" ItemsSource="{Binding Path=participantList}" SelectionChanged="part_SelectionChanged" HorizontalAlignment="Left" Height="24" Margin="248,92,0,0" VerticalAlignment="Top" Width="178" >
             <ComboBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
@@ -20,13 +24,33 @@
                 </DataTemplate>
             </ComboBox.ItemTemplate>
         </ComboBox>
-        <Button Name="btn_connect" Content="Connect EMG" Click="btn_connect_Click" IsEnabled="False" HorizontalAlignment="Left" Height="41" Margin="917,35,0,0" VerticalAlignment="Top" Width="111"/>
-        <Button Name="btn_start" Content="Start Streaming" Click="btn_start_Click" IsEnabled="False" HorizontalAlignment="Left" Height="41" Margin="1053,43,0,0" VerticalAlignment="Top" Width="112"/>
 
-        <TextBox Name="saveDir_textbox" TextChanged="directory_textChanged" HorizontalAlignment="Left" Height="26" Margin="512,79,0,0" TextWrapping="Wrap" Text="C:\" VerticalAlignment="Top" Width="210" />
-        <Button Name="btn_saveDirProvided" Content="OK!" Click="btn_saveDir_Click" IsEnabled="True"
-                HorizontalAlignment="Left" Margin="727,85,0,0" VerticalAlignment="Top"/>
+        <Button Name="btn_connectEMG" Content="Connect EMG" Click="btn_connectEMG_Click"  HorizontalAlignment="Left" Height="34" Margin="52,137,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button Name="btn_connectBIC" Content="Connect BIC" Click="btn_connectBIC_Click"  HorizontalAlignment="Left" Height="34" Margin="248,137,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button Name="btn_disconnectEMG" Content="Discnnect EMG" Click="btn_disconnectEMG_Click" HorizontalAlignment="Left" Height="34" Margin="52,176,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button Name="btn_disconnectBIC" Content="Disconnect BIC" Click="btn_disconnectBIC_Click"  HorizontalAlignment="Left" Height="34" Margin="248,176,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button Name="btn_startEMGlog" Content="Start EMG Log" Click="btn_startEMGlog_Click"  HorizontalAlignment="Left" Height="34" Margin="52,231,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button Name="btn_stopEMGlog" Content="Stop EMG Log" Click="btn_stopEMGlog_Click"  HorizontalAlignment="Left" Height="34" Margin="248,231,0,0" VerticalAlignment="Top" Width="178"/>
 
+        <TextBox x:Name="percentThresh_textbox"  Text="" HorizontalAlignment="Left" Height="34" Margin="589,31,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="34"/>
+        <Button x:Name="btn_threshSave" Click ="btn_thresh_Click" Content="Save Percent Threshold"  HorizontalAlignment="Left" Height="34" Margin="634,31,0,0" VerticalAlignment="Top" Width="134" RenderTransformOrigin="0.4,0.531"/>
+        <Button x:Name="btn_startStim" Content="Start Stimulation" Click="btn_startStim_Click"  HorizontalAlignment="Left" Height="34" Margin="590,86,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button x:Name="btn_stopStim" Content="Stop Stimulation" Click="btn_stopStim_Click"  HorizontalAlignment="Left" Height="34" Margin="804,87,0,0" VerticalAlignment="Top" Width="178"/>
+
+        <ListBox ItemsSource="{Binding channelList}" Margin="1359,10,50,686" SelectionMode="Multiple">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Name}" Checked="emgCheckBox_Changed"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <ListBox Name="bicCheckBox" ItemsSource="{Binding bicList}" Margin="1242,10,167,686" SelectionMode="Multiple">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Name}" Checked="bicCheckBox_Changed" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
         <!--WindowsFormsHost x:Name="RawEMGForm" Margin="32,200,750,10" Grid.Row="0" Grid.ColumnSpan="2">
             <winformchart:Chart x:Name="EMGStreamChart" Dock="Fill">
                 <winformchart:Chart.Series>
@@ -43,23 +67,7 @@
                 </winformchart:Chart.Titles>
             </winformchart:Chart>
         </WindowsFormsHost-->
-        <WindowsFormsHost x:Name="NeuroForm" Margin="32,200,750,10" Grid.Row="0" Grid.ColumnSpan="2">
-            <winformchart:Chart x:Name="neuroStreamChart" Dock="Fill">
-                <winformchart:Chart.Series>
-                    <winformchart:Series Name="series" ChartType="Line"/>
-                </winformchart:Chart.Series>
-                <winformchart:Chart.ChartAreas>
-                    <winformchart:ChartArea/>
-                </winformchart:Chart.ChartAreas>
-                <winformchart:Chart.Legends>
-                    <winformchart:Legend/>
-                </winformchart:Chart.Legends>
-                <winformchart:Chart.Titles>
-                    <winformchart:Title Text="Streamed Neural Data by Channel (V)"></winformchart:Title>
-                </winformchart:Chart.Titles>
-            </winformchart:Chart>
-        </WindowsFormsHost>
-        <WindowsFormsHost x:Name="FilteredEMGForm" Margin="750,200,32,10" Grid.Row="0" Grid.ColumnSpan="2">
+        <WindowsFormsHost x:Name="FilteredEMGForm" Margin="750,319,32,15" Grid.Row="0">
             <winformchart:Chart x:Name="FiltEMGStreamChart" Dock="Fill">
                 <winformchart:Chart.Series>
                     <winformchart:Series Name="series" ChartType="Line"/>
@@ -75,28 +83,21 @@
                 </winformchart:Chart.Titles>
             </winformchart:Chart>
         </WindowsFormsHost>
-        <ListBox ItemsSource="{Binding channelList}" Margin="1335,10,74,686" SelectionMode="Multiple">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Name}" Checked="emgCheckBox_Changed"/>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
-        <ListBox Name="bicCheckBox" ItemsSource="{Binding bicList}" Margin="1209,10,200,686" SelectionMode="Multiple">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Name}" Checked="bicCheckBox_Changed" />
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
-        <Button x:Name="btn_load" Content="Load Calibration Data" Click="btn_load_Click" HorizontalAlignment="Left" Height="24" Margin="472,26,0,0" VerticalAlignment="Top" Width="210"/>
-        <TextBox x:Name="percentThresh_textbox"  Text="" HorizontalAlignment="Left" Height="29" Margin="626,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="56"/>
-        <Button x:Name="btn_threshSave" Click ="btn_thresh_Click" Content="Save Percent Threshold" HorizontalAlignment="Left" Height="29" Margin="718,139,0,0" VerticalAlignment="Top" Width="158"/>
-        <Button x:Name="btn_startStim" Content="Start Stimulation" Click="btn_startStim_Click" HorizontalAlignment="Left" Height="36" Margin="1054,122,0,0" VerticalAlignment="Top" Width="111"/>
-        <Button x:Name="btn_stopStim" Content="Stop Stimulation" Click="btn_stopStim_Click" HorizontalAlignment="Left" Height="36" Margin="917,106,0,0" VerticalAlignment="Top" Width="111"/>
-        <CheckBox x:Name="calibration_checkbox" Content="Calibration" Checked="calibration_Checked" Unchecked="calibration_Unchecked" HorizontalAlignment="Left" Height="32" Margin="806,68,0,0" VerticalAlignment="Top" Width="87"/>
-        <!--Button x:Name="btn_emgConfigLoad" Click="btn_emgConfigLoad_Click" Content="Load EMG Config File" HorizontalAlignment="Left" Height="32" Margin="633,36,0,0" VerticalAlignment="Top" Width="106"/-->
-        <Button x:Name="btn_bicConfigLoad" Click="btn_bicConfigLoad_Click" Content="Load BIC Config File" HorizontalAlignment="Left" Height="24" Margin="718,26,0,0" VerticalAlignment="Top" Width="149"/>
-
+        <WindowsFormsHost x:Name="neuroForm" Margin="37,363,745,59" Grid.Row="0">
+            <winformchart:Chart x:Name="neuroStreamChart" Dock="Fill">
+                <winformchart:Chart.Series>
+                    <winformchart:Series Name="series" ChartType="Line"/>
+                </winformchart:Chart.Series>
+                <winformchart:Chart.ChartAreas>
+                    <winformchart:ChartArea/>
+                </winformchart:Chart.ChartAreas>
+                <winformchart:Chart.Legends>
+                    <winformchart:Legend/>
+                </winformchart:Chart.Legends>
+                <winformchart:Chart.Titles>
+                    <winformchart:Title Text="Neuro Data by Channel (V)"></winformchart:Title>
+                </winformchart:Chart.Titles>
+            </winformchart:Chart>
+        </WindowsFormsHost>
     </Grid>
 </Window>

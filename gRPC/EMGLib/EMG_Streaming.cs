@@ -40,14 +40,17 @@ namespace EMGLib
 
         // for logging
         StreamWriter emgSW;
+        StreamWriter emgFiltSW;
         StreamWriter emgEnvelopedSW;
         StreamWriter emgTimestampSW;
         public string currPart;
         public bool logging = false;
         string file_extension;
+        string save_path;
 
         private BlockingCollection<float[]> rawSamplesQueueForPlot = new BlockingCollection<float[]>();
-        private BlockingCollection<float[]> rawSamplesQueueForProcc = new BlockingCollection<float[]>();
+        private BlockingCollection<rawPacket> rawSamplesQueueForProcc = new BlockingCollection<rawPacket>();
+        private BlockingCollection<float[]> filtSamplesQueueForPlot = new BlockingCollection<float[]>();
 
         // related to streaming
         private BlockingCollection<byte[]> bytesBufferQueue = new BlockingCollection<byte[]>();
@@ -76,6 +79,19 @@ namespace EMGLib
 
         // calibration bool, if true stim is disabled, if false stim is enabled
         public bool calibrationOn = false;
+
+        private struct rawPacket
+        {
+            public rawPacket(float[] rawSamples, long timestamp)
+            {
+                samples = rawSamples;
+                stamp = timestamp;
+            }
+
+            public float[] samples { get; }
+            public long stamp { get; }
+
+        }
 
         public EMG_Streaming()
         { 
@@ -140,17 +156,17 @@ namespace EMGLib
             
             string filename = currPart + "_RawFormattedEMGData_" + file_extension;
             string stamp_filename = currPart + "_TimestampEMG_" + file_extension;
-            saveDir = Path.Combine(saveDir, currPart, datestamp);
+            save_path = Path.Combine(saveDir, currPart, datestamp);
             if (calibrationOn)
             {
-                saveDir = Path.Combine(saveDir, @"/" + "Calibration");
+                save_path = Path.Combine(save_path, @"/" + "Calibration");
             }
 
             try
             {
-                if (!Directory.Exists(saveDir))
+                if (!Directory.Exists(save_path))
                 {
-                    System.IO.Directory.CreateDirectory(saveDir);
+                    System.IO.Directory.CreateDirectory(save_path);
                 }
             }
             catch (Exception ex)
@@ -158,7 +174,7 @@ namespace EMGLib
                 Console.WriteLine("EMG Streamer, Directory Exception - " + ex.Message.ToString());
             }
 
-            emgSW = new StreamWriter(Path.Combine(saveDir, filename));
+            emgSW = new StreamWriter(Path.Combine(save_path, filename));
             string emgLog_label = "EMG1";
             for (int i = 1; i < numberOfChannels; i++)
             {
@@ -169,7 +185,7 @@ namespace EMGLib
             emgSW.Flush();
             // timestamp log file could be used for easier interpolation of timestamps if needed
             // (since there are repeats of the same timestamp for about 25 samples)
-            emgTimestampSW = new StreamWriter(Path.Combine(saveDir, stamp_filename));
+            emgTimestampSW = new StreamWriter(Path.Combine(save_path, stamp_filename));
             emgTimestampSW.WriteLine("Timestamp of EMG bytes retrieved");
             emgTimestampSW.Flush();
 
@@ -213,8 +229,12 @@ namespace EMGLib
                         }
 
                         // add unpacked data to queue for prepping to plot
-                        rawSamplesQueueForPlot.Add(unpackedSamp);
-                        rawSamplesQueueForProcc.Add(unpackedSamp); // WIP: ***** needs timestamp as well
+                        rawPacket rawSampBuff = new rawPacket(unpackedSamp, formattedTimestamp);
+                        rawSamplesQueueForProcc.Add(rawSampBuff);
+                        lock (plotDataLock)
+                        {
+                            rawSamplesQueueForPlot.Add(unpackedSamp); 
+                        }
 
                     }
                     emgSW.Flush();
@@ -231,7 +251,7 @@ namespace EMGLib
         }
 
         // TO DO: change the following method to filter and log filtered and algo related info
-        public void filtEMGstream(CancellationToken token, string saveDir)
+        public void filtEMGstream(CancellationToken token)
         {
             string filename;
             string stamp_filename;
@@ -240,8 +260,8 @@ namespace EMGLib
                 filename = currPart + "_filtEMGData_" + file_extension;
                 //string filenameFilt = @"\FilteredFormattedEMGData_" + file_extension;
                 stamp_filename = currPart + "_TimestampFilt_" + file_extension;
-                emgSW = new StreamWriter(saveDir + filename);
-                emgSW.WriteLine(string.Join(",", "emg channel", "filt signal", "signal timstamp"));
+                emgFiltSW = new StreamWriter(save_path + filename);
+                emgFiltSW.WriteLine(string.Join(",", "emg channel", "filt signal", "signal timstamp"));
                 
             }
             else
@@ -249,11 +269,11 @@ namespace EMGLib
                 filename = @"\StimEMGData_" + file_extension;
                 //string filenameFilt = @"\FilteredFormattedEMGData_" + file_extension;
                 stamp_filename = @"\StimTimestamp_" + file_extension;
-                emgSW = new StreamWriter(saveDir + filename);
-                emgSW.WriteLine(string.Join(",", "emg channel", "raw signal", "filt signal", "signal timstamp"));
+                emgFiltSW = new StreamWriter(save_path + filename);
+                emgFiltSW.WriteLine(string.Join(",", "emg channel", "filt signal", "signal timstamp"));
                 
                 filename = @"\EnvData_" + file_extension;
-                emgEnvelopedSW = new StreamWriter(saveDir + filename);
+                emgEnvelopedSW = new StreamWriter(save_path + filename);
                 emgEnvelopedSW.WriteLine(string.Join(",", "emg channel", "enveloped signal", "start stim", "stim command", "movement detected", "movement detected timestamp", "percent", "threshold"));
             }
             
@@ -263,53 +283,23 @@ namespace EMGLib
             //emgFiltSW = new StreamWriter(saveDir + filenameFilt);
             //emgFiltSW.WriteLine(string.Join(",", "emg channel", "channel signal", "timstamp"));
 
-            emgTimestampSW = new StreamWriter(saveDir + stamp_filename);
-            emgTimestampSW.WriteLine(string.Join(",", "retrieval timestamp of bytes as they become available", "number of bytes stored that became available"));
+            //emgTimestampSW = new StreamWriter(saveDir + stamp_filename);
+            //emgTimestampSW.WriteLine(string.Join(",", "retrieval timestamp of bytes as they become available", "number of bytes stored that became available"));
             while (!token.IsCancellationRequested)
             {
-                while (bytesBufferQueue.Count > 0)
+                try
                 {
-
-                    byte[] bufferBytes;
-                    long timestampForAllSamples;
-                    int bytesStoredinQueue;
-                    List<float> emgSampList = new List<float>();
-                    float[] emgSamples = new float[numberOfChannels];
-                    string[] timestampAllChannels = new string[numberOfChannels];
-                    double[] elapsed_time = new double[numberOfChannels];
-
-
-                    bufferBytes = bytesBufferQueue.Take();
-                    timestampForAllSamples = originalTimestampQueue.Take();
-                    bytesStoredinQueue = bytesAvailableQueue.Take();
-
-                    emgTimestampSW.WriteLine(string.Join(",", timestampForAllSamples, bytesStoredinQueue));
-                    float[] bufferFormattedData = new float[bytesStoredinQueue / bytesPerChannel];
-                    int indTracker = 0;
-                    for (int i = 0; i < bytesStoredinQueue / bytesPerChannel; i++)
+                    int rawSamplesAvailable = rawSamplesQueueForProcc.Count;
+                    if (rawSamplesAvailable > 0)
                     {
-                        byte[] byteBuffer;
-                        byteBuffer = bufferBytes.Skip(indTracker).Take(bytesPerChannel).ToArray();
-                        bufferFormattedData[i] = BitConverter.ToSingle(byteBuffer, 0);
-                        indTracker = indTracker + 4;
-                    }
-                    // for every sample: bytesStored/(4 bytes * 14 ch)
-                    indTracker = 0;
-                    while (indTracker < bufferFormattedData.Count())
-                    {
+                        rawPacket rawSampPacket = new rawPacket();
+                        rawSampPacket = rawSamplesQueueForProcc.Take();
+                        float[] rawSamples = rawSampPacket.samples;
+                        long timestampForAllSamples = rawSampPacket.stamp;
                         float[] filtSamples = new float[numberOfChannels];
                         float[] envelopedSamples = new float[numberOfChannels];
-                        // extract value for every channel
-                        for (int i = 0; i < numberOfChannels; ++i)
-                        {
-
-                            emgSamples[i] = bufferFormattedData[indTracker];
-                            emgSampList.Add(emgSamples[i]);
-                            //timestampAllChannels[i] = timestampForAllSamples.ToString();
-                            indTracker++;
-                        }
                         // filter data
-                        filtSamples = _processingMod.IIRFilter(emgSamples);
+                        filtSamples = _processingMod.IIRFilter(rawSamples);
                         envelopedSamples = _processingMod.envelopeSignals(_stimMod.rectifySignals(filtSamples));
                         // FILE SAVED FOR CALIBRATION DATA VS STIM DATA ARE DIFFERENT, SINCE CALIBRATION DATA WILL NOT INCLUDE STIM VALUES
                         // ADD CHECK BOX TO UI INDICATE WHETHER CALIBRATION
@@ -319,11 +309,11 @@ namespace EMGLib
                         // log data
                         if (calibrationOn)
                         {
-                            rawSamplesQueue.Add(emgSamples);
+                            rawSamplesQueue.Add(rawSamples);
                             filtSamplesQueue.Add(filtSamples);
                             for (int i = 0; i < filtSamples.Length; ++i)
                             {
-                                emgSW.WriteLine(string.Join(",", $"{i + 1}", emgSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples));
+                                emgFiltSW.WriteLine(string.Join(",", $"{i + 1}", rawSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples));
                             }
                         }
                         else
@@ -340,14 +330,15 @@ namespace EMGLib
 
                             for (int i = 0; i < filtSamples.Length; ++i)
                             {
-                                emgSW.WriteLine(string.Join(",", $"{i + 1}", emgSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples));
+                                emgFiltSW.WriteLine(string.Join(",", $"{i + 1}", rawSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples));
                                 emgEnvelopedSW.WriteLine(string.Join(",", $"{i + 1}", envelopedSamples[i].ToString(), _stimEnabled, _generateStim, movementDetected[i], movementDetectedTimestamp[i], _stimMod.percent, _stimMod.thresh[i]));
                             }
                         }
-                        
-
                     }
-
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine("Filt function thread - " + ex.Message);
                 }
             }
         }
@@ -362,7 +353,7 @@ namespace EMGLib
                 try
                 {
                     // check how much data is available
-                    int samplesAvailable = rawSamplesQueue.Count;
+                    int samplesAvailable = rawSamplesQueueForPlot.Count;
 
                     // for however much data is available, remove that much data from the beginning of the returned list
                     // turn all the available data into lists, concatenate that with the returned list,
@@ -386,7 +377,7 @@ namespace EMGLib
                             }
                             for (int i = numSamplesToBuffer; i < numSamplesToPlot; i++)
                             {
-                                float[] data = rawSamplesQueue.Take();
+                                float[] data = rawSamplesQueueForPlot.Take();
                                 r_emgDataToPlot[i] = new List<float>(data);
                             }
                         }
@@ -398,7 +389,7 @@ namespace EMGLib
                         {
                             for (int i = 0; i < numSamplesToPlot; i++)
                             {
-                                float[] data = rawSamplesQueue.Take();
+                                float[] data = rawSamplesQueueForPlot.Take();
                                 r_emgDataToPlot[i] = new List<float>(data);
                             }
                         }

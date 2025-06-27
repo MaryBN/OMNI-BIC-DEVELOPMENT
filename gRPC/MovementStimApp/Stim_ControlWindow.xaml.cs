@@ -20,6 +20,7 @@ using System.Text.Json.Serialization;
 using System.Windows.Controls.Primitives;
 using System.Xml;
 using System.Collections.ObjectModel;
+using System.IO.Packaging;
 
 namespace MovementStimAPP
 {
@@ -33,14 +34,13 @@ namespace MovementStimAPP
         private EMGLib.EMG_Streaming emgStreaming = new EMGLib.EMG_Streaming();
         public CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
-        Thread emgThread;
-        Thread unpackEMGstreamThread;
+        Thread emgStreamThread;
+        Thread filtEMGThread;
         Thread plotRawThread;
         Thread plotFiltThread;
 
         Thread startStimThread;
 
-        string saveDir;
         List<float>[] emgRawData;
         List<float>[] emgFiltData;
         List<double>[] threshData;
@@ -54,6 +54,9 @@ namespace MovementStimAPP
         private System.Timers.Timer neuroStreamChartUpdateTimer;
 
         private bool calibrating = false;
+        private bool delsysConnected = false;
+        private bool bicConnected = false;
+        private string dateStamp;
 
         public class Channel
         {
@@ -113,18 +116,18 @@ namespace MovementStimAPP
             emgStreaming.emgDataPort_Diconnect();
 
             plotRawThread.Abort();
-            unpackEMGstreamThread.Abort();
-            emgThread.Abort();
+            filtEMGThread.Abort();
+            emgStreamThread.Abort();
         }
-
         private void ControlWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            participantList = new ObservableCollection<Participant>();
+            dateStamp = $"{DateTime.Now:yyyy - MM - dd}";
             var colors_list = new System.Drawing.Color[]
             {
                 System.Drawing.Color.Blue,
                 System.Drawing.Color.Red,
                 System.Drawing.Color.Green,
-                System.Drawing.Color.Aqua,
                 System.Drawing.Color.DarkOrchid,
                 System.Drawing.Color.DeepPink,
                 System.Drawing.Color.Orange,
@@ -153,15 +156,26 @@ namespace MovementStimAPP
                 System.Drawing.Color.RosyBrown,
                 System.Drawing.Color.MediumPurple,
                 System.Drawing.Color.Sienna,
-                System.Drawing.Color.Indigo
+                System.Drawing.Color.Indigo,
+                System.Drawing.Color.Aqua
 };
-
-            btn_saveDirProvided.IsEnabled = true;
-            btn_start.IsEnabled = false;
-            btn_connect.IsEnabled = false;
-            btn_startStim.IsEnabled = false;
-            btn_stopStim.IsEnabled = false;
-            btn_bicConfigLoad.IsEnabled = false;
+            ////EMG
+            //btn_emgConfigLoad.IsEnabled = true;
+            //btn_connectEMG.IsEnabled = false;
+            //btn_startEMGlog.IsEnabled = false;
+            //btn_stopEMGlog.IsEnabled = false;
+            //btn_disconnectEMG.IsEnabled = false;
+            ////BIC
+            //btn_bicConfigLoad.IsEnabled = true;
+            //btn_connectBIC.IsEnabled = false;
+            //btn_disconnectBIC.IsEnabled = false;
+            ////Stim
+            //calibration_checkbox.IsEnabled = true;
+            //btn_loadCalib.IsEnabled = true;
+            //partSelect.IsEnabled = false;
+            //btn_threshSave.IsEnabled = false;
+            //btn_startStim.IsEnabled = false;
+            //btn_stopStim.IsEnabled = false;
 
             string seriesName;
 
@@ -296,6 +310,563 @@ namespace MovementStimAPP
 
         }
 
+
+        private void btn_emgConfigLoad_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // open dialog box to select file with patient-specific settings
+                var fileD = new Microsoft.Win32.OpenFileDialog();
+                bool? loadFile = fileD.ShowDialog();
+                if (loadFile == true)
+                {
+                    string fileName = fileD.FileName;
+                    if (File.Exists(fileName))
+                    {
+                        // load in .json file and read in stimulation parameters
+                        using (StreamReader fileReader = new StreamReader(fileName))
+                        {
+                            string configJson = fileReader.ReadToEnd();
+                            configInfo = System.Text.Json.JsonSerializer.Deserialize<Configuration>(configJson);
+                        }
+                    }
+                }
+                participantList.Clear();
+                //taskList.Clear();
+                for (int par = 0; par < configInfo.partIDs.Count; par++)
+                {
+                    participantList.Add(new Participant { IsSelected = false, ID = configInfo.partIDs[par] });
+                }
+                partSelect.IsEnabled = true;
+                //}
+                //for (int t = 0; t < configInfo.taskIDs.Count; t++)
+                //{
+                //    taskList.Add(new Task { IsSelected = false, Content = configInfo.taskIDs[t] });
+                //}
+                //taskHandler.IsEnabled = true;
+                //partSelect.IsEnabled = true;
+                //EMG
+                //btn_emgConfigLoad.IsEnabled = true;
+                //btn_connectEMG.IsEnabled = true;
+                //btn_startEMGlog.IsEnabled = false;
+                //btn_stopEMGlog.IsEnabled = false;
+                //btn_disconnectEMG.IsEnabled = false;
+                ////BIC
+                //btn_bicConfigLoad.IsEnabled = true;
+                //btn_connectBIC.IsEnabled = false;
+                //btn_disconnectBIC.IsEnabled = false;
+                ////Stim
+                //calibration_checkbox.IsEnabled = true;
+                //btn_loadCalib.IsEnabled = true;
+                //partSelect.IsEnabled = true;
+                //btn_threshSave.IsEnabled = false;
+                //btn_startStim.IsEnabled = false;
+                //btn_stopStim.IsEnabled = false;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Load Config threw and exception: " + ex.ToString());
+            }
+
+            
+        }
+        private void btn_bicConfigLoad_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // open dialog box to select file with patient-specific settings
+                var fileD = new Microsoft.Win32.OpenFileDialog();
+                bool? loadFile = fileD.ShowDialog();
+                if (loadFile == true)
+                {
+                    string fileName = fileD.FileName;
+                    if (File.Exists(fileName))
+                    {
+                        // load in .json file and read in stimulation parameters
+                        using (StreamReader fileReader = new StreamReader(fileName))
+                        {
+                            string configJson = fileReader.ReadToEnd();
+                            aBICManager.configInfo = System.Text.Json.JsonSerializer.Deserialize<BICManager.Configuration>(configJson);
+
+                        }
+
+                    }
+                }
+            }
+            catch (Exception theException)
+            {
+
+                Console.WriteLine(theException.Message);
+            }
+
+            ////EMG
+            //btn_emgConfigLoad.IsEnabled = true;
+            //btn_connectEMG.IsEnabled = false;
+            //btn_startEMGlog.IsEnabled = false;
+            //btn_stopEMGlog.IsEnabled = false;
+            //btn_disconnectEMG.IsEnabled = false;
+            ////BIC
+            //btn_bicConfigLoad.IsEnabled = true;
+            //if (btn_connectEMG.IsEnabled && !calibrating)
+            //{
+            //    btn_connectBIC.IsEnabled = true;
+            //}
+            //else
+            //{
+            //    btn_connectBIC.IsEnabled = false;
+            //}
+            // btn_disconnectBIC.IsEnabled = false;
+            ////Stim
+            //calibration_checkbox.IsEnabled = true;
+            //btn_loadCalib.IsEnabled = true;
+            //partSelect.IsEnabled = false;
+            //btn_threshSave.IsEnabled = false;
+            //btn_startStim.IsEnabled = false;
+            //btn_stopStim.IsEnabled = false;
+        }
+        private void part_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var selectedPart = e.AddedItems[0];
+            var part = selectedPart as Participant;
+            if (part != null)
+            {
+                btn_connectEMG.IsEnabled = true;
+                emgStreaming.currPart = part.ID;
+            }
+        }
+
+
+        private void calibration_Checked(object sender, RoutedEventArgs e)
+        {
+            //btn_bicConfigLoad.IsEnabled = false;
+            //bicCheckBox.IsEnabled = false;
+            //btn_loadCalib.IsEnabled = false;
+            //btn_threshSave.IsEnabled = false;
+            //btn_startStim.IsEnabled = false;
+            //btn_stopStim.IsEnabled = false;
+            calibrating = true;
+
+        }
+        private void calibration_Unchecked(object sender, RoutedEventArgs e)
+        {
+            //btn_bicConfigLoad.IsEnabled = true;
+            //bicCheckBox.IsEnabled = true;
+            //btn_loadCalib.IsEnabled = true;
+            //btn_threshSave.IsEnabled = true;
+            //btn_startStim.IsEnabled = false;
+            //btn_stopStim.IsEnabled = false;
+            calibrating = false;
+        }
+        private void btn_loadCalib_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                //maxSig = new float[numChannels];
+                int ch = 0;
+                // open dialog box to select file with patient-specific settings
+                var fileD = new Microsoft.Win32.OpenFileDialog();
+                bool? loadFile = fileD.ShowDialog();
+                if(loadFile == true)
+                {
+                    string fileName = fileD.FileName;
+                    if (File.Exists(fileName))
+                    {
+                        // load in the .csv file and read the calibration data i.e. the maximal contraction [filtered] value 
+                        using(StreamReader fileReader = new StreamReader(fileName))
+                        {
+                            while (!fileReader.EndOfStream)
+                            {
+                                var line = fileReader.ReadLine();
+                                var values = line.Split(',');
+                                float maxVal;
+                                float.TryParse(values[1], out maxVal);
+                                //maxSig[ch] = maxVal;
+                                emgStreaming._stimMod.maxSig[ch] = maxVal;
+                                ch++;
+                            }
+                            emgStreaming._stimMod.setThresh();
+                        }
+                        Console.WriteLine("Calibration Data was loaded");
+
+                    }
+                    else
+                    {
+                        Console.WriteLine("Calibration Data was not loaded");
+                    }
+                    
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+
+
+        private void btn_connectEMG_Click(object sender, RoutedEventArgs e)
+        {
+            cancellationTokenSource = new CancellationTokenSource();
+            baseConnection.Main();
+            // create/recreate threads
+            emgStreaming.emgDataPort_Connect();
+            emgStreaming.currPart = "testMTS";
+            emgStreamThread = new Thread(() => emgStreaming.StreamEMG(cancellationTokenSource.Token, "C:\\Users\\MRPICS\\Desktop\\Maryam\\Data", dateStamp));
+            filtEMGThread = new Thread(() => emgStreaming.filtEMGstream(cancellationTokenSource.Token));
+            
+            plotRawThread = new Thread(() => emgStreaming.prepRawForPlot(cancellationTokenSource.Token));
+            plotFiltThread = new Thread(() => emgStreaming.prepFiltForPlot(cancellationTokenSource.Token));
+
+            // Start the threads
+            emgStreamThread.Start();
+            filtEMGThread.Start();
+            plotRawThread.Start();
+            plotFiltThread.Start();
+            
+            // send command to base to start streaming
+            baseConnection.SendCommand("START");
+            delsysConnected = true;
+
+            // Start update timer
+            EMGChartUpdateTimer = new System.Timers.Timer(200);
+            EMGChartUpdateTimer.Elapsed += EMGChartUpdateTimer_Elapsed;
+            EMGChartUpdateTimer.Start();
+
+            ////EMG
+            //btn_emgConfigLoad.IsEnabled = false;
+            //btn_connectEMG.IsEnabled = false;
+            //btn_startEMGlog.IsEnabled = true;
+            //btn_stopEMGlog.IsEnabled = false;
+            //btn_disconnectEMG.IsEnabled = true;
+            ////BIC
+            //btn_bicConfigLoad.IsEnabled = true;
+            //btn_connectBIC.IsEnabled = false;
+            //btn_disconnectBIC.IsEnabled = false;
+            ////Stim
+            //calibration_checkbox.IsEnabled = false;
+            //btn_loadCalib.IsEnabled = false;
+            //partSelect.IsEnabled = false;
+            //btn_threshSave.IsEnabled = false;
+            //btn_startStim.IsEnabled = false;
+            //btn_stopStim.IsEnabled = false;
+        }
+        private void btn_connectBIC_Click(object sender, RoutedEventArgs e)
+        {
+            // connect to BIC
+            aBICManager.Initialize(1000);
+            aBICManager.BICConnect();
+            bicConnected = true;
+
+            neuroStreamChartUpdateTimer = new System.Timers.Timer(200);
+            neuroStreamChartUpdateTimer.Elapsed += neuroChartUpdateTimer_Elapsed;
+            neuroStreamChartUpdateTimer.Start();
+
+            ////EMG
+            //btn_emgConfigLoad.IsEnabled = false;
+            //btn_connectEMG.IsEnabled = false;
+            //btn_startEMGlog.IsEnabled = true;
+            //btn_stopEMGlog.IsEnabled = false;
+            //btn_disconnectEMG.IsEnabled = true;
+            ////BIC
+            //btn_bicConfigLoad.IsEnabled = true;
+            //btn_connectBIC.IsEnabled = false;
+            //btn_disconnectBIC.IsEnabled = false;
+            ////Stim
+            //calibration_checkbox.IsEnabled = false;
+            //btn_loadCalib.IsEnabled = false;
+            //partSelect.IsEnabled = false;
+            //if (delsysConnected && emgStreaming.logging)
+            //{
+            //    btn_threshSave.IsEnabled = true;
+            //    btn_startStim.IsEnabled = true;
+            //}
+            //btn_stopStim.IsEnabled = false;
+        }
+        private void btn_disconnectEMG_Click(object senser, RoutedEventArgs e)
+        {
+
+        }
+        private void btn_disconnectBIC_Click(object senser, RoutedEventArgs e)
+        {
+
+        }
+
+        // TO DO: modify to start recording when this is hit and add a start stim button
+        private void btn_startEMGlog_Click(object sender, RoutedEventArgs e)
+        {
+            emgStreaming.logging = true;
+
+            ////EMG
+            //btn_emgConfigLoad.IsEnabled = false;
+            //btn_connectEMG.IsEnabled = false;
+            //btn_startEMGlog.IsEnabled = false;
+            //btn_stopEMGlog.IsEnabled = true;
+            //btn_disconnectEMG.IsEnabled = false;
+            ////BIC
+            //btn_bicConfigLoad.IsEnabled = true;
+            //btn_connectBIC.IsEnabled = false;
+            //btn_disconnectBIC.IsEnabled = false;
+            ////Stim
+            //calibration_checkbox.IsEnabled = false;
+            //btn_loadCalib.IsEnabled = false;
+            //partSelect.IsEnabled = false;
+            //btn_threshSave.IsEnabled = false;
+            //btn_startStim.IsEnabled = false;
+            //btn_stopStim.IsEnabled = false;
+
+        }
+
+        private void btn_stopEMGlog_Click(object sender, RoutedEventArgs e)
+        {
+            emgStreaming.logging = false;
+
+            ////EMG
+            //btn_emgConfigLoad.IsEnabled = false;
+            //btn_connectEMG.IsEnabled = false;
+            //btn_startEMGlog.IsEnabled = true;
+            //btn_stopEMGlog.IsEnabled = false;
+            //btn_disconnectEMG.IsEnabled = false;
+            ////BIC
+            //btn_bicConfigLoad.IsEnabled = true;
+            //btn_connectBIC.IsEnabled = false;
+            //btn_disconnectBIC.IsEnabled = false;
+            ////Stim
+            //calibration_checkbox.IsEnabled = false;
+            //btn_loadCalib.IsEnabled = false;
+            //partSelect.IsEnabled = false;
+            //btn_threshSave.IsEnabled = false;
+            //btn_startStim.IsEnabled = false;
+            //btn_stopStim.IsEnabled = false;
+
+        }
+
+        bool OLstimON = false;
+
+        private void btn_thresh_Click(object sender, RoutedEventArgs e)
+        {
+            //thresh = new float[numChannels];
+            //percentThresh = float.Parse(percentThresh_textbox.Text);
+            //for (int ch = 0; ch < numChannels; ch++)
+            //{
+            //    thresh[ch] = maxSig[ch] * percent / 100;
+            //}
+            emgStreaming._stimMod.percent = float.Parse(percentThresh_textbox.Text);
+        }
+
+        private void btn_startStim_Click(object sender, RoutedEventArgs e)
+        {
+            startStimThread = new Thread(() => Stimulator());
+
+            //var configInfo = aBICManager.configInfo;
+            //try
+            //{
+
+            //    aBICManager.enableOpenLoopStimulation(true, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 4, configInfo.stimPeriod - (5 * configInfo.stimDuration) - 3500, configInfo.stimThreshold);
+            //    Console.WriteLine("OL enabled");
+            //}
+            //catch
+            //{
+            //    // Exception occured, gRPC command did not succeed, do not update UI button elements
+            //    Console.WriteLine("Open loop stimulation NOT started: load new configuration\n");
+
+            //    return;
+            //}
+
+            emgStreaming._stimEnabled = true;
+            startStimThread.Start();
+            //btn_stopStim.IsEnabled = true;
+            //btn_startStim.IsEnabled = false;
+        }
+
+        private void btn_stopStim_Click(Object sender, RoutedEventArgs e)
+        {
+            //var configInfo = aBICManager.configInfo;
+            emgStreaming._stimEnabled = false;
+            //aBICManager.enableOpenLoopStimulation(false, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 1, 20000, configInfo.stimThreshold);
+
+            startStimThread.Abort();
+            //btn_stopStim.IsEnabled = false;
+            //btn_startStim.IsEnabled = true;
+            //btn_threshSave.IsEnabled = true;
+        }
+
+
+        private void emgCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            // look for the selected items in the listbox
+            List<int> selectedChannels = new List<int>();
+            string chanString = "";
+            int chanVal;
+            bool valConvert = false;
+
+            // get a list of selected channels
+            var selected = from item in channelList
+                           where item.IsSelected == true
+                           select item.Name.ToString();
+
+            // convert from string to int type
+            foreach (String item in selected)
+            {
+                valConvert = Int32.TryParse(item, out chanVal);
+                selectedChannels.Add(chanVal);
+            }
+
+            // reset current legend
+            //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+            //delegate
+            //{
+            //    foreach (var series in EMGStreamChart.Series)
+            //    {
+            //        series.IsVisibleInLegend = false;
+            //        series.Enabled = false;
+            //    }
+            //}));
+
+            FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+            delegate
+            {
+                foreach (var series in FiltEMGStreamChart.Series)
+                {
+                    series.IsVisibleInLegend = false;
+                    series.Enabled = false;
+                }
+            }));
+
+
+            // update legend for data streaming chart for newest selection of channels
+            for (int i = 0; i < selectedChannels.Count; i++)
+            {
+                chanString = "EMG " + selectedChannels[i].ToString();
+
+                //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                //delegate
+                //{
+                //    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                //    EMGStreamChart.Series[chanString].Enabled = true;
+                //}));
+                FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                delegate
+                {
+                    FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                    FiltEMGStreamChart.Series[chanString].Enabled = true;
+                }));
+
+                if (!calibrating)
+                {
+                    // add threshold to legend for each selected channel
+                    chanString = "Thresh " + selectedChannels[i].ToString();
+                    //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    //delegate
+                    //{
+                    //EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                    //EMGStreamChart.Series[chanString].Enabled = true;
+                    //}));
+                    FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    delegate
+                    {
+                        FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                        FiltEMGStreamChart.Series[chanString].Enabled = true;
+                    }));
+
+                    // add stim occurrance to legend for each selected channel
+                    chanString = "Stim " + selectedChannels[i].ToString();
+                    //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    //delegate
+                    //{
+                    //    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                    //    EMGStreamChart.Series[chanString].Enabled = true;
+                    //}));
+                    FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    delegate
+                    {
+                        FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                        FiltEMGStreamChart.Series[chanString].Enabled = true;
+                    }));
+                }
+
+                //// if not calibrating, it means stim app is on and an extrac stream channels visualizes stim
+                //if (i + 1 == selectedChannels.Count)
+                //{
+                //    if (!calibrating)
+                //    {
+                //        chanString = "Stim";
+
+                //        EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                //        delegate
+                //        {
+                //            EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                //            EMGStreamChart.Series[chanString].Enabled = true;
+                //        }));
+                //        FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                //        delegate
+                //        {
+                //            FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                //            FiltEMGStreamChart.Series[chanString].Enabled = true;
+                //        }));
+                //    }
+                //}
+            }
+
+
+        }
+
+        private void bicCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            // look for the selected items in the listbox
+            List<int> selectedChannels = new List<int>();
+            string chanString = "";
+            int chanVal;
+            bool valConvert = false;
+
+            // get a list of selected channels
+            var selected = from item in bicList
+                           where item.IsSelected == true
+                           select item.Name.ToString();
+
+            // convert from string to int type
+            foreach (String item in selected)
+            {
+                valConvert = Int32.TryParse(item, out chanVal);
+                if (valConvert)
+                {
+                    selectedChannels.Add(chanVal);
+                }
+                else
+                {
+                    selectedChannels.Add(33);
+                }
+            }
+
+            // reset current legend
+            neuroStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+            delegate
+            {
+                foreach (var series in neuroStreamChart.Series)
+                {
+                    series.IsVisibleInLegend = false;
+                    series.Enabled = false;
+                }
+            }));
+
+            // update legend for newest selection of channels
+            for (int i = 0; i < selectedChannels.Count; i++)
+            {
+                if (selectedChannels[i] == 33)
+                {
+                    chanString = "Filtered Channel";
+                }
+                else
+                {
+                    chanString = "Channel " + selectedChannels[i].ToString();
+                }
+                neuroStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                delegate
+                {
+                    neuroStreamChart.Series[chanString].IsVisibleInLegend = true;
+                    neuroStreamChart.Series[chanString].Enabled = true;
+                }));
+            }
+        }
+
         private void EMGChartUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             // grab latest data and corresponding timestamp
@@ -327,7 +898,7 @@ namespace MovementStimAPP
             for (int i = 0; i < selectedChannels.Count; i++)
             {
                 chanString = "EMG " + selectedChannels[i].ToString();
-                var emgRaw_output = emgRawData.Select(row => row[selectedChannels[i] - 1]).ToList();
+                //var emgRaw_output = emgRawData.Select(row => row[selectedChannels[i] - 1]).ToList();
 
                 //try
                 //{
@@ -427,7 +998,7 @@ namespace MovementStimAPP
             }
 
         }
-        
+
         private void neuroChartUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             // grab latest data
@@ -477,417 +1048,11 @@ namespace MovementStimAPP
             }
         }
 
-        private void calibration_Checked(object sender, EventArgs e)
-        {
-            btn_bicConfigLoad.IsEnabled = false;
-            bicCheckBox.IsEnabled = false;
-            btn_load.IsEnabled = false;
-            btn_threshSave.IsEnabled = false;
-            btn_startStim.IsEnabled = false;
-            btn_stopStim.IsEnabled = false;
-            calibrating = true;
-
-        }
-        private void calibration_Unchecked(object sender, EventArgs e)
-        {
-            btn_bicConfigLoad.IsEnabled = true;
-            bicCheckBox.IsEnabled = true;
-            btn_load.IsEnabled = true;
-            btn_threshSave.IsEnabled = true;
-            btn_startStim.IsEnabled = false;
-            btn_stopStim.IsEnabled = false;
-            calibrating = false;
-        }
-        private void btn_load_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                //maxSig = new float[numChannels];
-                int ch = 0;
-                // open dialog box to select file with patient-specific settings
-                var fileD = new Microsoft.Win32.OpenFileDialog();
-                bool? loadFile = fileD.ShowDialog();
-                if(loadFile == true)
-                {
-                    string fileName = fileD.FileName;
-                    if (File.Exists(fileName))
-                    {
-                        // load in the .csv file and read the calibration data i.e. the maximal contraction [filtered] value 
-                        using(StreamReader fileReader = new StreamReader(fileName))
-                        {
-                            while (!fileReader.EndOfStream)
-                            {
-                                var line = fileReader.ReadLine();
-                                var values = line.Split(',');
-                                float maxVal;
-                                float.TryParse(values[1], out maxVal);
-                                //maxSig[ch] = maxVal;
-                                emgStreaming._stimMod.maxSig[ch] = maxVal;
-                                ch++;
-                            }
-                            emgStreaming._stimMod.setThresh();
-                        }
-                        Console.WriteLine("Calibration Data was loaded");
-
-                    }
-                    else
-                    {
-                        Console.WriteLine("Calibration Data was not loaded");
-                    }
-                    
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-        }
-
-
-        private void btn_thresh_Click(object sender, EventArgs e)
-        {
-            //thresh = new float[numChannels];
-            //percentThresh = float.Parse(percentThresh_textbox.Text);
-            //for (int ch = 0; ch < numChannels; ch++)
-            //{
-            //    thresh[ch] = maxSig[ch] * percent / 100;
-            //}
-            emgStreaming._stimMod.percent = float.Parse(percentThresh_textbox.Text);
-
-
-        }
-
-        private void btn_startStim_Click(object sender, EventArgs e)
-        {
-            startStimThread = new Thread(() => Stimulator());
-            
-            //var configInfo = aBICManager.configInfo;
-            //try
-            //{
-
-            //    aBICManager.enableOpenLoopStimulation(true, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 4, configInfo.stimPeriod - (5 * configInfo.stimDuration) - 3500, configInfo.stimThreshold);
-            //    Console.WriteLine("OL enabled");
-            //}
-            //catch
-            //{
-            //    // Exception occured, gRPC command did not succeed, do not update UI button elements
-            //    Console.WriteLine("Open loop stimulation NOT started: load new configuration\n");
-
-            //    return;
-            //}
-
-            emgStreaming._stimEnabled = true;
-            startStimThread.Start();
-            btn_stopStim.IsEnabled = true;
-            btn_startStim.IsEnabled = false;
-        }
-
-        private void btn_stopStim_Click(Object sender, EventArgs e)
-        {
-            //var configInfo = aBICManager.configInfo;
-            emgStreaming._stimEnabled = false;
-            //aBICManager.enableOpenLoopStimulation(false, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 1, 20000, configInfo.stimThreshold);
-
-            startStimThread.Abort();
-            btn_stopStim.IsEnabled = false;
-            btn_startStim.IsEnabled = true;
-            btn_threshSave.IsEnabled = true;
-        }
-
-        // TO DO: modify to connect to both delsys and BIC when this is hit -> potentially have separate buttons for the two?
-        private void btn_connect_Click(object sender, RoutedEventArgs e)
-        {
-            baseConnection.Main();
-
-
-            btn_saveDirProvided.IsEnabled = false;
-            btn_start.IsEnabled = true;
-            btn_connect.IsEnabled = false;
-            btn_startStim.IsEnabled = false;
-            btn_stopStim.IsEnabled = false;
-        }
-
-        // TO DO: modify to start recording when this is hit and add a start stim button
-        private void btn_start_Click(object sender, RoutedEventArgs e)
-        {
-            if (!calibrating)
-            {
-                // connect to BIC
-                aBICManager.Initialize(1000);
-                aBICManager.BICConnect();
-            }
-            
-
-            // create/recreate threads
-            emgStreaming.emgDataPort_Connect();
-            string dateStamp = $"{DateTime.Now:yyyy - MM - dd}";
-            emgStreaming.calibrationOn = calibrating;
-            emgThread = new Thread(() => emgStreaming.StreamEMG(cancellationTokenSource.Token, configInfo.save_path, dateStamp));
-            unpackEMGstreamThread = new Thread(() => emgStreaming.filtEMGstream(cancellationTokenSource.Token, 
-                                                                                    saveDir));
-            plotRawThread = new Thread(() => emgStreaming.prepRawForPlot(cancellationTokenSource.Token));
-
-            // Start the threads
-            emgThread.Start();
-            unpackEMGstreamThread.Start();
-            plotRawThread.Start();
-            baseConnection.SendCommand("START");
-
-            Thread.Sleep(1000);
-
-            btn_saveDirProvided.IsEnabled = false;
-            btn_start.IsEnabled = false;
-            btn_connect.IsEnabled = false;
-            btn_startStim.IsEnabled = true;
-            btn_stopStim.IsEnabled = false;
-
-            // Start update timer
-            //EMGChartUpdateTimer = new System.Timers.Timer(200);
-            //EMGChartUpdateTimer.Elapsed += EMGChartUpdateTimer_Elapsed;
-            //EMGChartUpdateTimer.Start();
-            if (!calibrating)
-            {
-                neuroStreamChartUpdateTimer = new System.Timers.Timer(200);
-                neuroStreamChartUpdateTimer.Elapsed += neuroChartUpdateTimer_Elapsed;
-                neuroStreamChartUpdateTimer.Start();
-            }
-        }
 
 
 
-        private void directory_textChanged(object sender, TextChangedEventArgs e)
-        {
-            // correspond to when content of directory text box has changed
-
-            // when changed, button to select "OK!" is enabled: this is currently buggy.
-            // if (!Directory.Exists(saveDir_textbox.Text))
-            // {
-            //     btn_saveDirProvided.IsEnabled = false;
-            // }
-
-            btn_start.IsEnabled = false;
-            btn_connect.IsEnabled = false;
-        }
-
-        private void btn_saveDir_Click(object sender, RoutedEventArgs e)
-        {
-            saveDir = saveDir_textbox.Text;
-            aBICManager.saveDir = saveDir;
-            //EMGLib.EMG_Streaming emgStreaming = new EMGLib.EMG_Streaming(saveDir);
-
-            btn_bicConfigLoad.IsEnabled = true;
-            btn_saveDirProvided.IsEnabled = false;
-            btn_start.IsEnabled = false;
-            btn_connect.IsEnabled = true;
-            btn_startStim.IsEnabled = false;
-            btn_stopStim.IsEnabled = false;
-        }
-        private void emgCheckBox_Changed(object sender, RoutedEventArgs e)
-        {
-            // look for the selected items in the listbox
-            List<int> selectedChannels = new List<int>();
-            string chanString = "";
-            int chanVal;
-            bool valConvert = false;
-
-            // get a list of selected channels
-            var selected = from item in channelList
-                           where item.IsSelected == true
-                           select item.Name.ToString();
-
-            // convert from string to int type
-            foreach (String item in selected)
-            {
-                valConvert = Int32.TryParse(item, out chanVal);
-                selectedChannels.Add(chanVal);
-            }
-
-            // reset current legend
-            //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-            //delegate
-            //{
-            //    foreach (var series in EMGStreamChart.Series)
-            //    {
-            //        series.IsVisibleInLegend = false;
-            //        series.Enabled = false;
-            //    }
-            //}));
-
-            FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-            delegate
-            {
-                foreach (var series in FiltEMGStreamChart.Series)
-                {
-                    series.IsVisibleInLegend = false;
-                    series.Enabled = false;
-                }
-            }));
 
 
-            // update legend for data streaming chart for newest selection of channels
-            for (int i = 0; i < selectedChannels.Count; i++)
-            {
-                chanString = "EMG " + selectedChannels[i].ToString();
-                
-                //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                //delegate
-                //{
-                //    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                //    EMGStreamChart.Series[chanString].Enabled = true;
-                //}));
-                FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                delegate
-                {
-                    FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                    FiltEMGStreamChart.Series[chanString].Enabled = true;
-                }));
-
-                if (!calibrating)
-                {
-                    // add threshold to legend for each selected channel
-                    chanString = "Thresh " + selectedChannels[i].ToString();
-                    //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    //delegate
-                    //{
-                    //EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                    //EMGStreamChart.Series[chanString].Enabled = true;
-                    //}));
-                    FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    delegate
-                    {
-                        FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                        FiltEMGStreamChart.Series[chanString].Enabled = true;
-                    }));
-
-                    // add stim occurrance to legend for each selected channel
-                    chanString = "Stim " + selectedChannels[i].ToString();
-                    //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    //delegate
-                    //{
-                    //    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                    //    EMGStreamChart.Series[chanString].Enabled = true;
-                    //}));
-                    FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    delegate
-                    {
-                        FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                        FiltEMGStreamChart.Series[chanString].Enabled = true;
-                    }));
-                }
-
-                //// if not calibrating, it means stim app is on and an extrac stream channels visualizes stim
-                //if (i + 1 == selectedChannels.Count)
-                //{
-                //    if (!calibrating)
-                //    {
-                //        chanString = "Stim";
-
-                //        EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                //        delegate
-                //        {
-                //            EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                //            EMGStreamChart.Series[chanString].Enabled = true;
-                //        }));
-                //        FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                //        delegate
-                //        {
-                //            FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                //            FiltEMGStreamChart.Series[chanString].Enabled = true;
-                //        }));
-                //    }
-                //}
-            }
-
-
-        }
-
-        private void bicCheckBox_Changed(object sender, EventArgs e)
-        {
-            // look for the selected items in the listbox
-            List<int> selectedChannels = new List<int>();
-            string chanString = "";
-            int chanVal;
-            bool valConvert = false;
-
-            // get a list of selected channels
-            var selected = from item in bicList
-                           where item.IsSelected == true
-                           select item.Name.ToString();
-
-            // convert from string to int type
-            foreach (String item in selected)
-            {
-                valConvert = Int32.TryParse(item, out chanVal);
-                if (valConvert)
-                {
-                    selectedChannels.Add(chanVal);
-                }
-                else
-                {
-                    selectedChannels.Add(33);
-                }
-            }
-
-            // reset current legend
-            neuroStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-            delegate
-            {
-                foreach (var series in neuroStreamChart.Series)
-                {
-                    series.IsVisibleInLegend = false;
-                    series.Enabled = false;
-                }
-            }));
-
-            // update legend for newest selection of channels
-            for (int i = 0; i < selectedChannels.Count; i++)
-            {
-                if (selectedChannels[i] == 33)
-                {
-                    chanString = "Filtered Channel";
-                }
-                else
-                {
-                    chanString = "Channel " + selectedChannels[i].ToString();
-                }
-                neuroStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                delegate
-                {
-                    neuroStreamChart.Series[chanString].IsVisibleInLegend = true;
-                    neuroStreamChart.Series[chanString].Enabled = true;
-                }));
-            }
-        }
-        private void btn_bicConfigLoad_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // open dialog box to select file with patient-specific settings
-                var fileD = new Microsoft.Win32.OpenFileDialog();
-                bool? loadFile = fileD.ShowDialog();
-                if (loadFile == true)
-                {
-                    string fileName = fileD.FileName;
-                    if (File.Exists(fileName))
-                    {
-                        // load in .json file and read in stimulation parameters
-                        using (StreamReader fileReader = new StreamReader(fileName))
-                        {
-                            string configJson = fileReader.ReadToEnd();
-                            aBICManager.configInfo = System.Text.Json.JsonSerializer.Deserialize<BICManager.Configuration>(configJson);
-                            
-                        }
-
-                    }
-                }
-            }
-            catch (Exception theException)
-            {
-                
-                Console.WriteLine(theException.Message);
-            }
-        }
-        bool OLstimON = false;
         private void Stimulator()
         {
             var configInfo = aBICManager.configInfo;
@@ -903,7 +1068,7 @@ namespace MovementStimAPP
                             aBICManager.enableOpenLoopStimulation(true, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 4, configInfo.stimPeriod - (5 * configInfo.stimDuration) - 3500, configInfo.stimThreshold);
                             OLstimON = true;
                             Console.WriteLine("OL enabled, " + OLstimON);
-                            
+
                         }
                         catch
                         {
@@ -914,7 +1079,7 @@ namespace MovementStimAPP
                         }
                         Thread.Sleep(20);
                     }
-                        
+
                 }
                 else
                 {
@@ -925,7 +1090,7 @@ namespace MovementStimAPP
                             aBICManager.enableOpenLoopStimulation(false, configInfo.monopolar, (uint)configInfo.stimChannel - 1, (uint)configInfo.returnChannel - 1, configInfo.stimAmplitude, configInfo.stimDuration, 1, 20000, configInfo.stimThreshold);
                             OLstimON = false;
                             Console.WriteLine("OL enabled, " + OLstimON);
-                            
+
                         }
                         catch
                         {
@@ -937,7 +1102,7 @@ namespace MovementStimAPP
                         Thread.Sleep(20);
                     }
                 }
-                
+
             }
             if (OLstimON)
             {
@@ -955,59 +1120,11 @@ namespace MovementStimAPP
 
                     return;
                 }
-                Thread.Sleep (20);
+                Thread.Sleep(20);
             }
             OLstimON = false;
         }
 
-        private void btn_emgConfigLoad_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // open dialog box to select file with patient-specific settings
-                var fileD = new Microsoft.Win32.OpenFileDialog();
-                bool? loadFile = fileD.ShowDialog();
-                if (loadFile == true)
-                {
-                    string fileName = fileD.FileName;
-                    if (File.Exists(fileName))
-                    {
-                        // load in .json file and read in stimulation parameters
-                        using (StreamReader fileReader = new StreamReader(fileName))
-                        {
-                            string configJson = fileReader.ReadToEnd();
-                            configInfo = System.Text.Json.JsonSerializer.Deserialize<Configuration>(configJson);
-                        }
-                    }
-                }
-                participantList.Clear();
-                //taskList.Clear();
-                for (int par = 0; par < configInfo.partIDs.Count; par++)
-                {
-                    participantList.Add(new Participant { IsSelected = false, ID = configInfo.partIDs[par] });
-                }
-                //}
-                //for (int t = 0; t < configInfo.taskIDs.Count; t++)
-                //{
-                //    taskList.Add(new Task { IsSelected = false, Content = configInfo.taskIDs[t] });
-                //}
-                //taskHandler.IsEnabled = true;
-                //partSelect.IsEnabled = true;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Load Config threw and exception: " + ex.ToString());
-            }
-        }
-        private void part_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var selectedPart = e.AddedItems[0];
-            var part = selectedPart as Participant;
-            if (part != null)
-            {
-                btn_connect.IsEnabled = true;
-                emgStreaming.currPart = part.ID;
-            }
-        }
+
     }
 }
