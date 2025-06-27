@@ -106,18 +106,26 @@ namespace MovementStimAPP
 
         private void ControlWindow_Closed(object sender, EventArgs e)
         {
-            // Sasha says: probably this timer is already stopped, since
-            // the object is null error indicates the garbage collector
-            // has already freed it.
-            aBICManager.Dispose();
+            if (bicConnected)
+            {
+                aBICManager.Dispose();
+                neuroStreamChartUpdateTimer.Stop();
+            }
+            if(delsysConnected)
+            {
+                EMGChartUpdateTimer.Stop();
+                cancellationTokenSource.Cancel();
+                emgStreaming.emgDataPort_Diconnect();
 
-            EMGChartUpdateTimer.Stop();
-            cancellationTokenSource.Cancel();
-            emgStreaming.emgDataPort_Diconnect();
+                plotRawThread.Abort();
+                plotFiltThread.Abort();
+                filtEMGThread.Abort();
+                emgStreamThread.Abort();
 
-            plotRawThread.Abort();
-            filtEMGThread.Abort();
-            emgStreamThread.Abort();
+                baseConnection.SendCommand("STOP");
+                baseConnection.SendCommand("QUIT");
+            }
+
         }
         private void ControlWindow_Loaded(object sender, RoutedEventArgs e)
         {
@@ -179,12 +187,12 @@ namespace MovementStimAPP
 
             string seriesName;
 
-            //EMGStreamChart.ChartAreas[0].AxisX.Title = "Time (ns)";
-            //EMGStreamChart.ChartAreas[0].AxisY.Title = "Raw EMG signal (V)";
+            EMGStreamChart.ChartAreas[0].AxisX.Title = "Time (ns)";
+            EMGStreamChart.ChartAreas[0].AxisY.Title = "Raw EMG signal (V)";
 
-            //EMGStreamChart.ChartAreas[0].AxisY.Minimum = -0.1e-3;
-            //EMGStreamChart.ChartAreas[0].AxisY.Maximum = 0.1e-3;
-            //EMGStreamChart.Series.Clear();
+            EMGStreamChart.ChartAreas[0].AxisY.Minimum = -0.1e-3;
+            EMGStreamChart.ChartAreas[0].AxisY.Maximum = 0.1e-3;
+            EMGStreamChart.Series.Clear();
 
             FiltEMGStreamChart.ChartAreas[0].AxisX.Title = "Time (ns)";
             FiltEMGStreamChart.ChartAreas[0].AxisY.Title = "Filt EMG signal (V)";
@@ -196,13 +204,13 @@ namespace MovementStimAPP
             for (int i = 1; i <= numChannels; i++)
             {
                 seriesName = "EMG " + i.ToString();
-                //EMGStreamChart.Series.Add(
-                //new System.Windows.Forms.DataVisualization.Charting.Series
-                //{
-                //    Name = seriesName,
-                //    Color = colors_list[i - 1],
-                //    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
-                //});
+                EMGStreamChart.Series.Add(
+                new System.Windows.Forms.DataVisualization.Charting.Series
+                {
+                    Name = seriesName,
+                    Color = colors_list[i - 1],
+                    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
+                });
 
                 FiltEMGStreamChart.Series.Add(
                 new System.Windows.Forms.DataVisualization.Charting.Series
@@ -214,8 +222,8 @@ namespace MovementStimAPP
 
 
                 //// when loading window, make legend invisible
-                //EMGStreamChart.Series[i - 1].IsVisibleInLegend = false;
-                //FiltEMGStreamChart.Series[i - 1].IsVisibleInLegend = false;
+                EMGStreamChart.Series[i - 1].IsVisibleInLegend = false;
+                FiltEMGStreamChart.Series[i - 1].IsVisibleInLegend = false;
             }
             if (!calibrating)
             {
@@ -223,13 +231,13 @@ namespace MovementStimAPP
                 for (int i = 1; i <= numChannels; i++)
                 {
                     seriesName = "Thresh " + i.ToString();
-                    //EMGStreamChart.Series.Add(
-                    //new System.Windows.Forms.DataVisualization.Charting.Series
-                    //{
-                    //    Name = seriesName,
-                    //    Color = colors_list[i - 1],
-                    //    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
-                    //});
+                    EMGStreamChart.Series.Add(
+                    new System.Windows.Forms.DataVisualization.Charting.Series
+                    {
+                        Name = seriesName,
+                        Color = colors_list[i - 1],
+                        ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
+                    });
 
                     FiltEMGStreamChart.Series.Add(
                     new System.Windows.Forms.DataVisualization.Charting.Series
@@ -241,19 +249,19 @@ namespace MovementStimAPP
 
 
                     // when loading window, make legend invisible
-                    //EMGStreamChart.Series[numChannels + i - 1].IsVisibleInLegend = false;
-                    //FiltEMGStreamChart.Series[numChannels + i - 1].IsVisibleInLegend = false;
+                    EMGStreamChart.Series[numChannels + i - 1].IsVisibleInLegend = false;
+                    FiltEMGStreamChart.Series[numChannels + i - 1].IsVisibleInLegend = false;
                 }
                 for (int i = 1; i <= numChannels; i++)
                 {
                     seriesName = "Stim " + i.ToString();
-                    //EMGStreamChart.Series.Add(
-                    //new System.Windows.Forms.DataVisualization.Charting.Series
-                    //{
-                    //    Name = seriesName,
-                    //    Color = colors_list[i - 1],
-                    //    ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
-                    //});
+                    EMGStreamChart.Series.Add(
+                    new System.Windows.Forms.DataVisualization.Charting.Series
+                    {
+                        Name = seriesName,
+                        Color = colors_list[i - 1],
+                        ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.FastLine
+                    });
 
                     FiltEMGStreamChart.Series.Add(
                     new System.Windows.Forms.DataVisualization.Charting.Series
@@ -265,15 +273,15 @@ namespace MovementStimAPP
 
 
                     // when loading window, make legend invisible
-                    //EMGStreamChart.Series[numChannels + i - 1].IsVisibleInLegend = false;
-                    //FiltEMGStreamChart.Series[numChannels + i - 1].IsVisibleInLegend = false;
+                    EMGStreamChart.Series[numChannels + i - 1].IsVisibleInLegend = false;
+                    FiltEMGStreamChart.Series[numChannels + i - 1].IsVisibleInLegend = false;
 
                 }
-                
+
             }
             for (int i = 0; i < FiltEMGStreamChart.Series.Count; i++)
             {
-                //EMGStreamChart.Series[i].IsVisibleInLegend = false;
+                EMGStreamChart.Series[i].IsVisibleInLegend = false;
                 FiltEMGStreamChart.Series[i].IsVisibleInLegend = false;
             }
 
@@ -332,7 +340,6 @@ namespace MovementStimAPP
                     }
                 }
                 participantList.Clear();
-                //taskList.Clear();
                 for (int par = 0; par < configInfo.partIDs.Count; par++)
                 {
                     participantList.Add(new Participant { IsSelected = false, ID = configInfo.partIDs[par] });
@@ -711,15 +718,15 @@ namespace MovementStimAPP
             }
 
             // reset current legend
-            //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-            //delegate
-            //{
-            //    foreach (var series in EMGStreamChart.Series)
-            //    {
-            //        series.IsVisibleInLegend = false;
-            //        series.Enabled = false;
-            //    }
-            //}));
+            EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+            delegate
+            {
+                foreach (var series in EMGStreamChart.Series)
+                {
+                    series.IsVisibleInLegend = false;
+                    series.Enabled = false;
+                }
+            }));
 
             FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
             delegate
@@ -737,12 +744,12 @@ namespace MovementStimAPP
             {
                 chanString = "EMG " + selectedChannels[i].ToString();
 
-                //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                //delegate
-                //{
-                //    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                //    EMGStreamChart.Series[chanString].Enabled = true;
-                //}));
+                EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                delegate
+                {
+                    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                    EMGStreamChart.Series[chanString].Enabled = true;
+                }));
                 FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
                 delegate
                 {
@@ -754,12 +761,12 @@ namespace MovementStimAPP
                 {
                     // add threshold to legend for each selected channel
                     chanString = "Thresh " + selectedChannels[i].ToString();
-                    //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    //delegate
-                    //{
-                    //EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                    //EMGStreamChart.Series[chanString].Enabled = true;
-                    //}));
+                    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    delegate
+                    {
+                        EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                        EMGStreamChart.Series[chanString].Enabled = true;
+                    }));
                     FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
                     delegate
                     {
@@ -769,12 +776,12 @@ namespace MovementStimAPP
 
                     // add stim occurrance to legend for each selected channel
                     chanString = "Stim " + selectedChannels[i].ToString();
-                    //EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    //delegate
-                    //{
-                    //    EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                    //    EMGStreamChart.Series[chanString].Enabled = true;
-                    //}));
+                    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    delegate
+                    {
+                        EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                        EMGStreamChart.Series[chanString].Enabled = true;
+                    }));
                     FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
                     delegate
                     {
@@ -784,26 +791,26 @@ namespace MovementStimAPP
                 }
 
                 //// if not calibrating, it means stim app is on and an extrac stream channels visualizes stim
-                //if (i + 1 == selectedChannels.Count)
-                //{
-                //    if (!calibrating)
-                //    {
-                //        chanString = "Stim";
+                if (i + 1 == selectedChannels.Count)
+                {
+                    if (!calibrating)
+                    {
+                        chanString = "Stim";
 
-                //        EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                //        delegate
-                //        {
-                //            EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                //            EMGStreamChart.Series[chanString].Enabled = true;
-                //        }));
-                //        FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                //        delegate
-                //        {
-                //            FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
-                //            FiltEMGStreamChart.Series[chanString].Enabled = true;
-                //        }));
-                //    }
-                //}
+                        EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                        delegate
+                        {
+                            EMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                            EMGStreamChart.Series[chanString].Enabled = true;
+                        }));
+                        FiltEMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                        delegate
+                        {
+                            FiltEMGStreamChart.Series[chanString].IsVisibleInLegend = true;
+                            FiltEMGStreamChart.Series[chanString].Enabled = true;
+                        }));
+                    }
+                }
             }
 
 
@@ -870,13 +877,13 @@ namespace MovementStimAPP
         private void EMGChartUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             // grab latest data and corresponding timestamp
-            //emgRawData = emgStreaming.getRawData();
+            emgRawData = emgStreaming.getRawData();
             emgFiltData = emgStreaming.getFiltData();
-            if (!calibrating)
-            {
-                // get data
-                (threshData, stimData) = emgStreaming.getMovementStimData();
-            }
+            //if (!calibrating)
+            //{
+            //    // get data
+            //    (threshData, stimData) = emgStreaming.getMovementStimData();
+            //}
 
             // look for the selected items in the listbox
             List<int> selectedChannels = new List<int>();
@@ -898,21 +905,21 @@ namespace MovementStimAPP
             for (int i = 0; i < selectedChannels.Count; i++)
             {
                 chanString = "EMG " + selectedChannels[i].ToString();
-                //var emgRaw_output = emgRawData.Select(row => row[selectedChannels[i] - 1]).ToList();
+                var emgRaw_output = emgRawData.Select(row => row[selectedChannels[i] - 1]).ToList();
 
-                //try
-                //{
+                try
+                {
 
-                //    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                //    delegate
-                //    {
-                //        EMGStreamChart.Series[chanString].Points.DataBindY(emgRaw_output);
-                //    }));
-                //}
-                //catch (Exception ex)
-                //{
-                //    Console.WriteLine("Chart threw an exception: " + ex.Message);
-                //}
+                    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                    delegate
+                    {
+                        EMGStreamChart.Series[chanString].Points.DataBindY(emgRaw_output);
+                    }));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Chart threw an exception: " + ex.Message);
+                }
                 var emgFilt_output = emgFiltData.Select(row => row[selectedChannels[i] - 1]).ToList();
                 try
                 {
@@ -935,19 +942,19 @@ namespace MovementStimAPP
                     chanString = "Thresh " + selectedChannels[i].ToString();
                     var thresh_output = threshData.Select(row => row[selectedChannels[i] - 1]).ToList();
 
-                    //try
-                    //{
+                    try
+                    {
 
-                    //    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    //    delegate
-                    //    {
-                    //        EMGStreamChart.Series[chanString].Points.DataBindY(thresh_output);
-                    //    }));
-                    //}
-                    //catch (Exception ex)
-                    //{
-                    //    Console.WriteLine("Chart threw an exception: " + ex.Message);
-                    //}
+                        EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                        delegate
+                        {
+                            EMGStreamChart.Series[chanString].Points.DataBindY(thresh_output);
+                        }));
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Chart threw an exception: " + ex.Message);
+                    }
                     try
                     {
 
@@ -966,19 +973,19 @@ namespace MovementStimAPP
                     chanString = "Stim " + selectedChannels[i].ToString();
                     var stim_output = stimData.Select(row => row[selectedChannels[i] - 1]).ToList();
 
-                    //try
-                    //{
+                    try
+                    {
 
-                    //    EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
-                    //    delegate
-                    //    {
-                    //        EMGStreamChart.Series[chanString].Points.DataBindY(stim_output);
-                    //    }));
-                    //}
-                    //catch (Exception ex)
-                    //{
-                    //    Console.WriteLine("Chart threw an exception: " + ex.Message);
-                    //}
+                        EMGStreamChart.Invoke(new System.Windows.Forms.MethodInvoker(
+                        delegate
+                        {
+                            EMGStreamChart.Series[chanString].Points.DataBindY(stim_output);
+                        }));
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Chart threw an exception: " + ex.Message);
+                    }
                     emgFilt_output = emgFiltData.Select(row => row[selectedChannels[i] - 1]).ToList();
                     try
                     {

@@ -15,7 +15,7 @@
         <Button x:Name="btn_loadCalib" Content="Load Calibration Data" Click="btn_loadCalib_Click" HorizontalAlignment="Left" Height="23" Margin="52,92,0,0" VerticalAlignment="Top" Width="178"/>
 
         <TextBlock HorizontalAlignment="Left" Height="18" Margin="260,70,0,0" TextWrapping="Wrap" Text="Select Participant ID" VerticalAlignment="Top" Width="154" TextAlignment="Center"/>
-        <ComboBox x:Name="partSelect" ItemsSource="{Binding Path=participantList}" SelectionChanged="part_SelectionChanged" HorizontalAlignment="Left" Height="24" Margin="248,92,0,0" VerticalAlignment="Top" Width="178" >
+        <ComboBox x:Name="partSelect" ItemsSource="{Binding Path=participantList}" SelectionChanged="part_SelectionChanged" IsEnabled="True" HorizontalAlignment="Left" Height="24" Margin="248,92,0,0" VerticalAlignment="Top" Width="178" >
             <ComboBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
@@ -32,26 +32,26 @@
         <Button Name="btn_startEMGlog" Content="Start EMG Log" Click="btn_startEMGlog_Click"  HorizontalAlignment="Left" Height="34" Margin="52,231,0,0" VerticalAlignment="Top" Width="178"/>
         <Button Name="btn_stopEMGlog" Content="Stop EMG Log" Click="btn_stopEMGlog_Click"  HorizontalAlignment="Left" Height="34" Margin="248,231,0,0" VerticalAlignment="Top" Width="178"/>
 
-        <TextBox x:Name="percentThresh_textbox"  Text="" HorizontalAlignment="Left" Height="34" Margin="589,31,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="34"/>
-        <Button x:Name="btn_threshSave" Click ="btn_thresh_Click" Content="Save Percent Threshold"  HorizontalAlignment="Left" Height="34" Margin="634,31,0,0" VerticalAlignment="Top" Width="134" RenderTransformOrigin="0.4,0.531"/>
-        <Button x:Name="btn_startStim" Content="Start Stimulation" Click="btn_startStim_Click"  HorizontalAlignment="Left" Height="34" Margin="590,86,0,0" VerticalAlignment="Top" Width="178"/>
-        <Button x:Name="btn_stopStim" Content="Stop Stimulation" Click="btn_stopStim_Click"  HorizontalAlignment="Left" Height="34" Margin="804,87,0,0" VerticalAlignment="Top" Width="178"/>
+        <TextBox x:Name="percentThresh_textbox"  Text="" HorizontalAlignment="Left" Height="34" Margin="45,294,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="34"/>
+        <Button x:Name="btn_threshSave" Click ="btn_thresh_Click" Content="Save Percent Threshold"  HorizontalAlignment="Left" Height="34" Margin="90,294,0,0" VerticalAlignment="Top" Width="134" RenderTransformOrigin="0.4,0.531"/>
+        <Button x:Name="btn_startStim" Content="Start Stimulation" Click="btn_startStim_Click"  HorizontalAlignment="Left" Height="34" Margin="46,348,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button x:Name="btn_stopStim" Content="Stop Stimulation" Click="btn_stopStim_Click"  HorizontalAlignment="Left" Height="34" Margin="260,350,0,0" VerticalAlignment="Top" Width="178"/>
 
-        <ListBox ItemsSource="{Binding channelList}" Margin="1359,10,50,686" SelectionMode="Multiple">
+        <ListBox ItemsSource="{Binding channelList}" Margin="256,442,1153,254" SelectionMode="Multiple">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Name}" Checked="emgCheckBox_Changed"/>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
-        <ListBox Name="bicCheckBox" ItemsSource="{Binding bicList}" Margin="1242,10,167,686" SelectionMode="Multiple">
+        <ListBox Name="bicCheckBox" ItemsSource="{Binding bicList}" Margin="139,442,1270,254" SelectionMode="Multiple">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Name}" Checked="bicCheckBox_Changed" />
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
-        <!--WindowsFormsHost x:Name="RawEMGForm" Margin="32,200,750,10" Grid.Row="0" Grid.ColumnSpan="2">
+        <WindowsFormsHost x:Name="RawEMGForm" Margin="470,600,48,21" Grid.Row="0">
             <winformchart:Chart x:Name="EMGStreamChart" Dock="Fill">
                 <winformchart:Chart.Series>
                     <winformchart:Series Name="series" ChartType="Line"/>
@@ -66,8 +66,8 @@
                     <winformchart:Title Text="Streamed Data by Channel (V)"></winformchart:Title>
                 </winformchart:Chart.Titles>
             </winformchart:Chart>
-        </WindowsFormsHost-->
-        <WindowsFormsHost x:Name="FilteredEMGForm" Margin="750,319,32,15" Grid.Row="0">
+        </WindowsFormsHost>
+        <WindowsFormsHost x:Name="FilteredEMGForm" Margin="471,278,49,311" Grid.Row="0">
             <winformchart:Chart x:Name="FiltEMGStreamChart" Dock="Fill">
                 <winformchart:Chart.Series>
                     <winformchart:Series Name="series" ChartType="Line"/>
@@ -83,7 +83,7 @@
                 </winformchart:Chart.Titles>
             </winformchart:Chart>
         </WindowsFormsHost>
-        <WindowsFormsHost x:Name="neuroForm" Margin="37,363,745,59" Grid.Row="0">
+        <WindowsFormsHost x:Name="neuroForm" Margin="469,12,47,622" Grid.Row="0">
             <winformchart:Chart x:Name="neuroStreamChart" Dock="Fill">
                 <winformchart:Chart.Series>
                     <winformchart:Series Name="series" ChartType="Line"/>

@@ -30,11 +30,8 @@ namespace EMGLib
         private Object plotDataLock = new Object();
         private Object plotFiltLock = new object();
 
-        private List<float>[] rawData;
-        private List<float>[] filtData;
-
-        private List<double>[] threshData;
-        private List<int>[] stimData;
+        private List<double>[] threshDataToPlot;
+        private List<int>[] stimDataToPlot;
 
         public bool streamingStatus = false;
 
@@ -48,29 +45,19 @@ namespace EMGLib
         string file_extension;
         string save_path;
 
+        // for plotting
         private BlockingCollection<float[]> rawSamplesQueueForPlot = new BlockingCollection<float[]>();
-        private BlockingCollection<rawPacket> rawSamplesQueueForProcc = new BlockingCollection<rawPacket>();
         private BlockingCollection<float[]> filtSamplesQueueForPlot = new BlockingCollection<float[]>();
 
-        // related to streaming
-        private BlockingCollection<byte[]> bytesBufferQueue = new BlockingCollection<byte[]>();
-        private BlockingCollection<float[]> rawSamplesQueue = new BlockingCollection<float[]>();
-        private BlockingCollection<List<float>> rawSamplesListQueue = new BlockingCollection<List<float>>();
-        private BlockingCollection<long> originalTimestampQueue = new BlockingCollection<long>();
-        private BlockingCollection<int> bytesAvailableQueue = new BlockingCollection<int>();
-        private BlockingCollection<List<float>[]> plotRawDataQueue = new BlockingCollection<List<float>[]>();
-        private BlockingCollection<List<float>[]> plotFiltDataQueue = new BlockingCollection<List<float>[]>();
 
         // related to filter
+        private BlockingCollection<rawPacket> rawSamplesQueueForProcc = new BlockingCollection<rawPacket>();
         public Processing_Modules _processingMod;
-        private BlockingCollection<float[]> filtSamplesQueue = new BlockingCollection<float[]>();
 
         // related to stim
         public Stim_Modules _stimMod;
-        private BlockingCollection<double[]> threshSamplesQueue = new BlockingCollection<double[]>();
-        private BlockingCollection<int[]> stimSamplesQueue = new BlockingCollection<int[]>();
-        private BlockingCollection<List<double>[]> plotThreshDataQueue = new BlockingCollection<List<double>[]>();
-        private BlockingCollection<List<int>[]> plotStimDataQueue = new BlockingCollection<List<int>[]>();
+        //private BlockingCollection<double[]> threshSamplesQueueForPlot = new BlockingCollection<double[]>();
+        //private BlockingCollection<int[]> stimSamplesQueueForPlot = new BlockingCollection<int[]>();
 
         public bool _generateStim = false;
         public bool _stimEnabled = false;
@@ -99,27 +86,31 @@ namespace EMGLib
             r_emgDataToPlot = new List<float>[numSamplesToPlot];
             f_emgDataToPlot = new List<float>[numSamplesToPlot];
 
+            threshDataToPlot = new List<double>[numSamplesToPlot];
+            stimDataToPlot = new List<int>[numSamplesToPlot];
+
             file_extension = $"{DateTime.Now:yyyy - MM - dd_HH - mm - ss}.csv";
-            // 
-            rawData = new List<float>[numSamplesToPlot];
-            filtData = new List<float>[numSamplesToPlot];
-            threshData = new List<double>[numSamplesToPlot];
-            stimData = new List<int>[numSamplesToPlot];
-            //
 
             _processingMod = new Processing_Modules(numberOfChannels);
             _stimMod = new Stim_Modules(numberOfChannels);
-
 
 
             // create a non-null array of lists 
             for (int i = 0; i < numSamplesToPlot; i++)
             {
                 float[] data = new float[numberOfChannels];
+                double[] t = new double[numberOfChannels];
+                int[] s = new int[numberOfChannels];
                 for (int ch = 0; ch < numberOfChannels; ch++)
+                {
                     data[ch] = 0f;
+                    t[ch] = 0f;
+                    s[ch] = 0;
+                }
                 r_emgDataToPlot[i] = new List<float>(data);
                 f_emgDataToPlot[i] = new List<float>(data);
+                threshDataToPlot[i] = new List<double>(t);
+                stimDataToPlot[i] = new List<int>(s);   
             }
 
 
@@ -143,6 +134,12 @@ namespace EMGLib
 
             emgSW.Dispose();
             emgTimestampSW.Dispose();
+
+            emgFiltSW.Dispose();
+            if (!calibrationOn)
+            {
+                emgEnvelopedSW.Dispose();
+            }
         }
 
         public void StreamEMG(CancellationToken token, string saveDir, string datestamp)
@@ -237,12 +234,13 @@ namespace EMGLib
                         }
 
                     }
-                    emgSW.Flush();
-                    emgTimestampSW.Flush();
+                    
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("EMG Streamer - ", e);
+                    emgSW.Flush();
+                    emgTimestampSW.Flush();
+                    Console.WriteLine("EMG Streamer - " + e.Message);
                 }
             }
             // flush outside of while loop to avoid taking up processing time
@@ -262,7 +260,8 @@ namespace EMGLib
                 stamp_filename = currPart + "_TimestampFilt_" + file_extension;
                 emgFiltSW = new StreamWriter(save_path + filename);
                 emgFiltSW.WriteLine(string.Join(",", "emg channel", "filt signal", "signal timstamp"));
-                
+                emgFiltSW.Flush();
+
             }
             else
             {
@@ -271,20 +270,14 @@ namespace EMGLib
                 stamp_filename = @"\StimTimestamp_" + file_extension;
                 emgFiltSW = new StreamWriter(save_path + filename);
                 emgFiltSW.WriteLine(string.Join(",", "emg channel", "filt signal", "signal timstamp"));
-                
+                emgFiltSW.Flush();
                 filename = @"\EnvData_" + file_extension;
                 emgEnvelopedSW = new StreamWriter(save_path + filename);
                 emgEnvelopedSW.WriteLine(string.Join(",", "emg channel", "enveloped signal", "start stim", "stim command", "movement detected", "movement detected timestamp", "percent", "threshold"));
+                emgEnvelopedSW.Flush();
             }
             
             
-            //emgSW.WriteLine(string.Join(",", "emg channel", "raw signal", "filt signal", "signal timstamp", "movement detected", "movement detected timestamp"));
-
-            //emgFiltSW = new StreamWriter(saveDir + filenameFilt);
-            //emgFiltSW.WriteLine(string.Join(",", "emg channel", "channel signal", "timstamp"));
-
-            //emgTimestampSW = new StreamWriter(saveDir + stamp_filename);
-            //emgTimestampSW.WriteLine(string.Join(",", "retrieval timestamp of bytes as they become available", "number of bytes stored that became available"));
             while (!token.IsCancellationRequested)
             {
                 try
@@ -309,11 +302,10 @@ namespace EMGLib
                         // log data
                         if (calibrationOn)
                         {
-                            rawSamplesQueue.Add(rawSamples);
-                            filtSamplesQueue.Add(filtSamples);
+                            filtSamplesQueueForPlot.Add(filtSamples);
                             for (int i = 0; i < filtSamples.Length; ++i)
                             {
-                                emgFiltSW.WriteLine(string.Join(",", $"{i + 1}", rawSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples));
+                                emgFiltSW.WriteLine(string.Join(",", $"{i + 1}", filtSamples[i].ToString(), timestampForAllSamples));
                             }
                         }
                         else
@@ -324,13 +316,17 @@ namespace EMGLib
 
                             _generateStim = _stimMod.generateStim;
                             //rawSamplesQueue.Add(emgSamples);
-                            filtSamplesQueue.Add(filtSamples);
-                            threshSamplesQueue.Add(_stimMod.thresh);
-                            stimSamplesQueue.Add(movementDetected);
+                            lock (plotFiltLock)
+                            {
+                                filtSamplesQueueForPlot.Add(filtSamples);
+                                
+                            }
+                            //threshSamplesQueueForPlot.Add(_stimMod.thresh);
+                            //stimSamplesQueueForPlot.Add(movementDetected);
 
                             for (int i = 0; i < filtSamples.Length; ++i)
                             {
-                                emgFiltSW.WriteLine(string.Join(",", $"{i + 1}", rawSamples[i].ToString(), filtSamples[i].ToString(), timestampForAllSamples));
+                                emgFiltSW.WriteLine(string.Join(",", $"{i + 1}", filtSamples[i].ToString(), timestampForAllSamples));
                                 emgEnvelopedSW.WriteLine(string.Join(",", $"{i + 1}", envelopedSamples[i].ToString(), _stimEnabled, _generateStim, movementDetected[i], movementDetectedTimestamp[i], _stimMod.percent, _stimMod.thresh[i]));
                             }
                         }
@@ -338,8 +334,18 @@ namespace EMGLib
                 }
                 catch(Exception ex)
                 {
+                    emgFiltSW.Flush();
+                    if (!calibrationOn)
+                    {
+                        emgEnvelopedSW.Flush();
+                    }
                     Console.WriteLine("Filt function thread - " + ex.Message);
                 }
+            }
+            emgFiltSW.Flush();
+            if (!calibrationOn)
+            {
+                emgEnvelopedSW.Flush();
             }
         }
         // TO DO: add another method for prepping filtered data for plotting
@@ -412,7 +418,7 @@ namespace EMGLib
                 try
                 {
                     // check how much data is available
-                    int samplesAvailable = filtSamplesQueue.Count;
+                    int samplesAvailable = filtSamplesQueueForPlot.Count;
 
                     // for however much data is available, remove that much data from the beginning of the returned list
                     // turn all the available data into lists, concatenate that with the returned list,
@@ -436,7 +442,7 @@ namespace EMGLib
                             }
                             for (int i = numSamplesToBuffer; i < numSamplesToPlot; i++)
                             {
-                                float[] data = filtSamplesQueue.Take();
+                                float[] data = filtSamplesQueueForPlot.Take();
                                 f_emgDataToPlot[i] = new List<float>(data);
                             }
                         }
@@ -448,7 +454,7 @@ namespace EMGLib
                         {
                             for (int i = 0; i < numSamplesToPlot; i++)
                             {
-                                float[] data = filtSamplesQueue.Take();
+                                float[] data = filtSamplesQueueForPlot.Take();
                                 f_emgDataToPlot[i] = new List<float>(data);
                             }
                         }
@@ -472,17 +478,21 @@ namespace EMGLib
         // TO DO: this needs to be implemented
         public List<float>[] getFiltData()
         {
-            List<float>[] plotFiltData = plotFiltDataQueue.Take();
-            return plotFiltData; // this would return null if rawSamplesQueue.Count <=0 ---> needs to be fixed
+            List<float>[] emgDataToPlotBuffer = new List<float>[numSamplesToPlot];
+            lock (plotFiltLock)
+            {
+                f_emgDataToPlot.CopyTo(emgDataToPlotBuffer, 0);
+            }
+            return emgDataToPlotBuffer;
         }
         // TO DO:
-        public (List<double>[] thresh, List<int>[] stim) getMovementStimData()
-        {
-            List<double>[] plotThreshData = plotThreshDataQueue.Take();
-            List<int>[] plotStimData = plotStimDataQueue.Take();
+        //public (List<double>[] thresh, List<int>[] stim) getMovementStimData()
+        //{
+        //    List<double>[] plotThreshData = plotThreshDataQueue.Take();
+        //    List<int>[] plotStimData = plotStimDataQueue.Take();
 
-            return (plotThreshData, plotStimData);
-        }
+        //    return (plotThreshData, plotStimData);
+        //}
 
         private double elapsedTime(long sampleStamp)
         {
