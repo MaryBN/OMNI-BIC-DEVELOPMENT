@@ -35,7 +35,8 @@ namespace MovementStimAPP
 
         Thread emgThread;
         Thread unpackEMGstreamThread;
-        Thread plotThread;
+        Thread plotRawThread;
+        Thread plotFiltThread;
 
         Thread startStimThread;
 
@@ -111,7 +112,7 @@ namespace MovementStimAPP
             cancellationTokenSource.Cancel();
             emgStreaming.emgDataPort_Diconnect();
 
-            plotThread.Abort();
+            plotRawThread.Abort();
             unpackEMGstreamThread.Abort();
             emgThread.Abort();
         }
@@ -620,16 +621,16 @@ namespace MovementStimAPP
             // create/recreate threads
             emgStreaming.emgDataPort_Connect();
             string dateStamp = $"{DateTime.Now:yyyy - MM - dd}";
+            emgStreaming.calibrationOn = calibrating;
             emgThread = new Thread(() => emgStreaming.StreamEMG(cancellationTokenSource.Token, configInfo.save_path, dateStamp));
-            unpackEMGstreamThread = new Thread(() => emgStreaming.unpackEMGstream(cancellationTokenSource.Token, 
-                                                                                    saveDir, 
-                                                                                        calibrating));
-            plotThread = new Thread(() => emgStreaming.prepForPlot(cancellationTokenSource.Token));
+            unpackEMGstreamThread = new Thread(() => emgStreaming.filtEMGstream(cancellationTokenSource.Token, 
+                                                                                    saveDir));
+            plotRawThread = new Thread(() => emgStreaming.prepRawForPlot(cancellationTokenSource.Token));
 
             // Start the threads
             emgThread.Start();
             unpackEMGstreamThread.Start();
-            plotThread.Start();
+            plotRawThread.Start();
             baseConnection.SendCommand("START");
 
             Thread.Sleep(1000);

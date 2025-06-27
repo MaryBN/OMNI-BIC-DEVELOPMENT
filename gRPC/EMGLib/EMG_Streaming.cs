@@ -28,6 +28,7 @@ namespace EMGLib
         private List<float>[] r_emgDataToPlot; // raw data
         private List<float>[] f_emgDataToPlot; // filt data
         private Object plotDataLock = new Object();
+        private Object plotFiltLock = new object();
 
         private List<float>[] rawData;
         private List<float>[] filtData;
@@ -43,6 +44,7 @@ namespace EMGLib
         StreamWriter emgTimestampSW;
         public string currPart;
         public bool logging = false;
+        string file_extension;
 
         private BlockingCollection<float[]> rawSamplesQueueForPlot = new BlockingCollection<float[]>();
         private BlockingCollection<float[]> rawSamplesQueueForProcc = new BlockingCollection<float[]>();
@@ -73,7 +75,7 @@ namespace EMGLib
         private static long streamStart_timestamp;
 
         // calibration bool, if true stim is disabled, if false stim is enabled
-        private bool calibrationOn = false;
+        public bool calibrationOn = false;
 
         public EMG_Streaming()
         { 
@@ -81,6 +83,7 @@ namespace EMGLib
             r_emgDataToPlot = new List<float>[numSamplesToPlot];
             f_emgDataToPlot = new List<float>[numSamplesToPlot];
 
+            file_extension = $"{DateTime.Now:yyyy - MM - dd_HH - mm - ss}.csv";
             // 
             rawData = new List<float>[numSamplesToPlot];
             filtData = new List<float>[numSamplesToPlot];
@@ -102,6 +105,8 @@ namespace EMGLib
                 r_emgDataToPlot[i] = new List<float>(data);
                 f_emgDataToPlot[i] = new List<float>(data);
             }
+
+
         }
 
         public void emgDataPort_Connect()
@@ -132,10 +137,14 @@ namespace EMGLib
             emgReader = new BinaryReader(emgStream);
 
             // setup logging
-            string file_extension = $"{DateTime.Now:yyyy - MM - dd_HH - mm - ss}.csv";
+            
             string filename = currPart + "_RawFormattedEMGData_" + file_extension;
             string stamp_filename = currPart + "_TimestampEMG_" + file_extension;
             saveDir = Path.Combine(saveDir, currPart, datestamp);
+            if (calibrationOn)
+            {
+                saveDir = Path.Combine(saveDir, @"/" + "Calibration");
+            }
 
             try
             {
@@ -167,7 +176,6 @@ namespace EMGLib
             while (!token.IsCancellationRequested)
             {
                 // beging streaming bytes from the API
-
                 try
                 {
                     byte[] sampleBuffer;
@@ -223,19 +231,17 @@ namespace EMGLib
         }
 
         // TO DO: change the following method to filter and log filtered and algo related info
-        public void unpackEMGstream(CancellationToken token, string saveDir, bool calibrating)
+        public void filtEMGstream(CancellationToken token, string saveDir)
         {
-            calibrationOn = calibrating;
-            string file_extension = $"{DateTime.Now:yyyy - MM - dd_HH - mm - ss}.csv";
             string filename;
             string stamp_filename;
             if (calibrationOn)
             {
-                filename = @"\CalibrationEMGData_" + file_extension;
+                filename = currPart + "_filtEMGData_" + file_extension;
                 //string filenameFilt = @"\FilteredFormattedEMGData_" + file_extension;
-                stamp_filename = @"\CalibrationTimestamp_" + file_extension;
+                stamp_filename = currPart + "_TimestampFilt_" + file_extension;
                 emgSW = new StreamWriter(saveDir + filename);
-                emgSW.WriteLine(string.Join(",", "emg channel", "raw signal", "filt signal", "signal timstamp"));
+                emgSW.WriteLine(string.Join(",", "emg channel", "filt signal", "signal timstamp"));
                 
             }
             else
@@ -346,7 +352,7 @@ namespace EMGLib
             }
         }
         // TO DO: add another method for prepping filtered data for plotting
-        public void prepForPlot(CancellationToken token)
+        public void prepRawForPlot(CancellationToken token)
         {
 
             // check how much data is available
@@ -405,7 +411,64 @@ namespace EMGLib
             }
         }
 
+        public void prepFiltForPlot(CancellationToken token)
+        {
 
+            // check how much data is available
+            // check how much data is in the returned list for plotting (if it's empty, only return when it's no longer empty)
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    // check how much data is available
+                    int samplesAvailable = filtSamplesQueue.Count;
+
+                    // for however much data is available, remove that much data from the beginning of the returned list
+                    // turn all the available data into lists, concatenate that with the returned list,
+                    if (samplesAvailable < numSamplesToPlot && samplesAvailable != 0)
+                    {
+                        // for every sample not available in the numSamplesToPlot
+                        int numSamplesToBuffer = numSamplesToPlot - samplesAvailable;
+                        List<float>[] buffer = new List<float>[numSamplesToBuffer];
+                        buffer[0] = f_emgDataToPlot[numSamplesToPlot - numSamplesToBuffer];
+                        int indTracker = 1;
+                        lock (plotFiltLock)
+                        {
+                            for (int b = numSamplesToPlot - numSamplesToBuffer + 1; b < numSamplesToPlot; b++)
+                            {
+                                buffer[indTracker] = f_emgDataToPlot[b];
+                                indTracker++;
+                            }
+                            for (int b = 0; b < numSamplesToBuffer; b++)
+                            {
+                                f_emgDataToPlot[b] = buffer[b];
+                            }
+                            for (int i = numSamplesToBuffer; i < numSamplesToPlot; i++)
+                            {
+                                float[] data = filtSamplesQueue.Take();
+                                f_emgDataToPlot[i] = new List<float>(data);
+                            }
+                        }
+
+                    }
+                    else if (samplesAvailable >= numSamplesToPlot)
+                    {
+                        lock (plotFiltLock)
+                        {
+                            for (int i = 0; i < numSamplesToPlot; i++)
+                            {
+                                float[] data = filtSamplesQueue.Take();
+                                f_emgDataToPlot[i] = new List<float>(data);
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Prep for Flot - " + e.Message);
+                }
+            }
+        }
         public List<float>[] getRawData()
         {
             List<float>[] emgDataToPlotBuffer = new List<float>[numSamplesToPlot];
