@@ -84,12 +84,11 @@ namespace MovementStimAPP
         //public float percentThresh;
         public Stim_ControlWindow()
         {
-
             InitializeComponent();
             channelList = new List<Channel>();
             channelNumList = new List<int>();
-
             bicList = new List<Channel>();
+            participantList = new ObservableCollection<Participant>();
 
             for (int i = 1; i <= numChannels; i++)
             {
@@ -130,7 +129,7 @@ namespace MovementStimAPP
         }
         private void ControlWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            participantList = new ObservableCollection<Participant>();
+            
             dateStamp = $"{DateTime.Now:yyyy - MM - dd}";
             var colors_list = new System.Drawing.Color[]
             {
@@ -344,6 +343,7 @@ namespace MovementStimAPP
                 for (int par = 0; par < EMGconfigInfo.partIDs.Count; par++)
                 {
                     participantList.Add(new Participant { IsSelected = false, ID = EMGconfigInfo.partIDs[par] });
+                    Console.WriteLine(participantList);
                 }
                 partSelect.IsEnabled = true;
 
