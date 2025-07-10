@@ -54,9 +54,13 @@ namespace MovementStimAPP
         private System.Timers.Timer neuroStreamChartUpdateTimer;
 
         private bool calibrating = false;
+        private bool partSelected = false;
+        private bool bicConfigLoaded = false;
+        private string dateStamp;
+
         private bool delsysConnected = false;
         private bool bicConnected = false;
-        private string dateStamp;
+        private bool startStim = false;
 
         public class Channel
         {
@@ -130,7 +134,6 @@ namespace MovementStimAPP
         private void ControlWindow_Loaded(object sender, RoutedEventArgs e)
         {
             
-            dateStamp = $"{DateTime.Now:yyyy - MM - dd}";
             var colors_list = new System.Drawing.Color[]
             {
                 System.Drawing.Color.Blue,
@@ -336,6 +339,7 @@ namespace MovementStimAPP
                         {
                             string configJson = fileReader.ReadToEnd();
                             EMGconfigInfo = System.Text.Json.JsonSerializer.Deserialize<emgConfiguration>(configJson);
+                            aBICManager.saveDir = EMGconfigInfo.save_path;
                         }
                     }
                 }
@@ -377,6 +381,11 @@ namespace MovementStimAPP
 
                     }
                 }
+                bicConfigLoaded = true;
+                if (partSelected)
+                {
+                    btn_connectBIC.IsEnabled = true;
+                }
             }
             catch (Exception theException)
             {
@@ -389,8 +398,15 @@ namespace MovementStimAPP
             var part = selectedPart as Participant;
             if (part != null)
             {
-                btn_connectEMG.IsEnabled = true;
+                partSelected = true;
                 emgStreaming.currPart = part.ID;
+
+                btn_connectEMG.IsEnabled = true;
+                if (bicConfigLoaded)
+                {
+                    btn_connectBIC.IsEnabled = true;
+                }
+                
             }
         }
 
@@ -446,6 +462,7 @@ namespace MovementStimAPP
                     }
                     
                 }
+                percentThresh_textbox.IsEnabled = true;
             }
             catch (Exception ex)
             {
@@ -456,13 +473,15 @@ namespace MovementStimAPP
 
         private void btn_connectEMG_Click(object sender, RoutedEventArgs e)
         {
+
+            dateStamp = $"{DateTime.Now:yyyy - MM - dd}";
+            string path = System.IO.Path.Combine(EMGconfigInfo.save_path, emgStreaming.currPart, dateStamp);
             cancellationTokenSource = new CancellationTokenSource();
             baseConnection.Main();
             // create/recreate threads
             emgStreaming.emgDataPort_Connect();
-            emgStreaming.currPart = "testMTS";
-            emgStreamThread = new Thread(() => emgStreaming.StreamEMG(cancellationTokenSource.Token, "C:\\Users\\MRPICS\\Desktop\\Maryam\\Data", dateStamp));
-            filtEMGThread = new Thread(() => emgStreaming.filtEMGstream(cancellationTokenSource.Token));
+            emgStreamThread = new Thread(() => emgStreaming.StreamEMG(cancellationTokenSource.Token, path));
+            filtEMGThread = new Thread(() => emgStreaming.filtEMGstream(cancellationTokenSource.Token, path));
             
             plotRawThread = new Thread(() => emgStreaming.prepRawForPlot(cancellationTokenSource.Token));
             plotFiltThread = new Thread(() => emgStreaming.prepFiltForPlot(cancellationTokenSource.Token));
@@ -482,6 +501,9 @@ namespace MovementStimAPP
             EMGChartUpdateTimer.Elapsed += EMGChartUpdateTimer_Elapsed;
             EMGChartUpdateTimer.Start();
 
+            btn_connectEMG.IsEnabled = false;
+            btn_disconnectEMG.IsEnabled = true;
+            btn_startEMGlog.IsEnabled = true;
         }
         private void btn_connectBIC_Click(object sender, RoutedEventArgs e)
         {
@@ -493,6 +515,9 @@ namespace MovementStimAPP
             neuroStreamChartUpdateTimer = new System.Timers.Timer(200);
             neuroStreamChartUpdateTimer.Elapsed += neuroChartUpdateTimer_Elapsed;
             neuroStreamChartUpdateTimer.Start();
+
+            btn_connectBIC.IsEnabled = false;
+            btn_disconnectBIC.IsEnabled = true;
 
         }
         private void btn_disconnectEMG_Click(object senser, RoutedEventArgs e)
@@ -509,12 +534,27 @@ namespace MovementStimAPP
         {
             emgStreaming.logging = true;
 
+            btn_startEMGlog.IsEnabled = false;
+
+            // do not allow to stop logging if stimulation is on -> all data should be logged
+            if (!startStim)
+            {
+                btn_stopEMGlog.IsEnabled = true;
+            }
+            
+            // only if BIC is connected and threshold is selected allow for start stim to be enabled
+            if (bicConnected && emgStreaming._stimMod.percent>0)
+            {
+                btn_startStim.IsEnabled = true;
+            }
+
         }
 
         private void btn_stopEMGlog_Click(object sender, RoutedEventArgs e)
         {
             emgStreaming.logging = false;
-
+            btn_startEMGlog.IsEnabled = true;
+            btn_stopEMGlog.IsEnabled = false;
         }
 
         bool OLstimON = false;
@@ -532,6 +572,7 @@ namespace MovementStimAPP
 
         private void btn_startStim_Click(object sender, RoutedEventArgs e)
         {
+            startStim = true;
             startStimThread = new Thread(() => Stimulator());
 
             var configInfo = aBICManager.configInfo;

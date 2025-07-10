@@ -9,7 +9,7 @@
         Title="ControlWindow" Height="900" Width="1500" Loaded="ControlWindow_Loaded" Closed="ControlWindow_Closed">
     <Grid>
         <Button x:Name="btn_emgConfigLoad" Click="btn_emgConfigLoad_Click" Content="Load EMG Config File" HorizontalAlignment="Left" Height="34" Margin="52,31,0,0" VerticalAlignment="Top" Width="178"/>
-        <Button x:Name="btn_bicConfigLoad" Click="btn_bicConfigLoad_Click" Content="Load BIC Config File" HorizontalAlignment="Left" Height="34" Margin="248,31,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button x:Name="btn_bicConfigLoad" Click="btn_bicConfigLoad_Click" Content="Load BIC Config File" HorizontalAlignment="Left" Height="34" Margin="248,31,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
 
         <CheckBox x:Name="calibration_checkbox" Content="Calibration" Checked="calibration_Checked" Unchecked="calibration_Unchecked" HorizontalAlignment="Left" IsEnabled="True" Height="32" Margin="98,71,0,0" VerticalAlignment="Top" Width="86"/>
         <Button x:Name="btn_loadCalib" Content="Load Calibration Data" Click="btn_loadCalib_Click" HorizontalAlignment="Left" Height="23" Margin="52,92,0,0" VerticalAlignment="Top" Width="178"/>
@@ -24,19 +24,19 @@
                 </DataTemplate>
             </ComboBox.ItemTemplate>
         </ComboBox>
-        
 
-        <Button Name="btn_connectEMG" Content="Connect EMG" Click="btn_connectEMG_Click"  HorizontalAlignment="Left" Height="34" Margin="52,137,0,0" VerticalAlignment="Top" Width="178"/>
-        <Button Name="btn_connectBIC" Content="Connect BIC" Click="btn_connectBIC_Click"  HorizontalAlignment="Left" Height="34" Margin="248,137,0,0" VerticalAlignment="Top" Width="178"/>
-        <Button Name="btn_disconnectEMG" Content="Discnnect EMG" Click="btn_disconnectEMG_Click" HorizontalAlignment="Left" Height="34" Margin="52,176,0,0" VerticalAlignment="Top" Width="178"/>
-        <Button Name="btn_disconnectBIC" Content="Disconnect BIC" Click="btn_disconnectBIC_Click"  HorizontalAlignment="Left" Height="34" Margin="248,176,0,0" VerticalAlignment="Top" Width="178"/>
-        <Button Name="btn_startEMGlog" Content="Start EMG Log" Click="btn_startEMGlog_Click"  HorizontalAlignment="Left" Height="34" Margin="52,231,0,0" VerticalAlignment="Top" Width="178"/>
-        <Button Name="btn_stopEMGlog" Content="Stop EMG Log" Click="btn_stopEMGlog_Click"  HorizontalAlignment="Left" Height="34" Margin="248,231,0,0" VerticalAlignment="Top" Width="178"/>
 
-        <TextBox x:Name="percentThresh_textbox"  Text="" HorizontalAlignment="Left" Height="34" Margin="45,294,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="34"/>
-        <Button x:Name="btn_threshSave" Click ="btn_thresh_Click" Content="Save Percent Threshold"  HorizontalAlignment="Left" Height="34" Margin="90,294,0,0" VerticalAlignment="Top" Width="134" RenderTransformOrigin="0.4,0.531"/>
-        <Button x:Name="btn_startStim" Content="Start Stimulation" Click="btn_startStim_Click"  HorizontalAlignment="Left" Height="34" Margin="46,348,0,0" VerticalAlignment="Top" Width="178"/>
-        <Button x:Name="btn_stopStim" Content="Stop Stimulation" Click="btn_stopStim_Click"  HorizontalAlignment="Left" Height="34" Margin="260,350,0,0" VerticalAlignment="Top" Width="178"/>
+        <Button Name="btn_connectEMG" Content="Connect EMG" Click="btn_connectEMG_Click"  HorizontalAlignment="Left" Height="34" Margin="52,137,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
+        <Button Name="btn_connectBIC" Content="Connect BIC" Click="btn_connectBIC_Click"  HorizontalAlignment="Left" Height="34" Margin="248,137,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
+        <Button Name="btn_disconnectEMG" Content="Discnnect EMG" Click="btn_disconnectEMG_Click" HorizontalAlignment="Left" Height="34" Margin="52,176,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
+        <Button Name="btn_disconnectBIC" Content="Disconnect BIC" Click="btn_disconnectBIC_Click"  HorizontalAlignment="Left" Height="34" Margin="248,176,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
+        <Button Name="btn_startEMGlog" Content="Start EMG Log" Click="btn_startEMGlog_Click"  HorizontalAlignment="Left" Height="34" Margin="52,231,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
+        <Button Name="btn_stopEMGlog" Content="Stop EMG Log" Click="btn_stopEMGlog_Click"  HorizontalAlignment="Left" Height="34" Margin="248,231,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
+
+        <TextBox x:Name="percentThresh_textbox"  Text="%" HorizontalAlignment="Left" Height="18" Margin="52,302,0,0" TextWrapping="WrapWithOverflow" VerticalAlignment="Top" Width="34" TextAlignment="Center" Background="#FFE6C0C0" IsEnabled="False"/>
+        <Button x:Name="btn_threshSave" Click ="btn_thresh_Click" Content="Save Percent Threshold"  HorizontalAlignment="Left" Height="34" Margin="98,294,0,0" VerticalAlignment="Top" Width="132" RenderTransformOrigin="0.4,0.531" IsEnabled="False"/>
+        <Button x:Name="btn_startStim" Content="Start Stimulation" Click="btn_startStim_Click"  HorizontalAlignment="Left" Height="34" Margin="52,348,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
+        <Button x:Name="btn_stopStim" Content="Stop Stimulation" Click="btn_stopStim_Click"  HorizontalAlignment="Left" Height="34" Margin="248,348,0,0" VerticalAlignment="Top" Width="178" IsEnabled="False"/>
 
         <ListBox ItemsSource="{Binding channelList}" Margin="256,442,1153,254" SelectionMode="Multiple">
             <ListBox.ItemTemplate>

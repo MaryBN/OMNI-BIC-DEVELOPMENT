@@ -43,7 +43,6 @@ namespace EMGLib
         public string currPart;
         public bool logging = false;
         string file_extension;
-        string save_path;
 
         // for plotting
         private BlockingCollection<float[]> rawSamplesQueueForPlot = new BlockingCollection<float[]>();
@@ -142,7 +141,7 @@ namespace EMGLib
             }
         }
 
-        public void StreamEMG(CancellationToken token, string saveDir, string datestamp)
+        public void StreamEMG(CancellationToken token, string saveDir)
         {
             // establish transmission
             streamStart_timestamp = DateTime.Now.Ticks;
@@ -153,17 +152,16 @@ namespace EMGLib
             
             string filename = currPart + "_RawFormattedEMGData_" + file_extension;
             string stamp_filename = currPart + "_TimestampEMG_" + file_extension;
-            save_path = Path.Combine(saveDir, currPart, datestamp);
             if (calibrationOn)
             {
-                save_path = Path.Combine(save_path, @"/" + "Calibration");
+                saveDir = Path.Combine(saveDir, @"\" + "Calibration");
             }
 
             try
             {
-                if (!Directory.Exists(save_path))
+                if (!Directory.Exists(saveDir))
                 {
-                    System.IO.Directory.CreateDirectory(save_path);
+                    System.IO.Directory.CreateDirectory(saveDir);
                 }
             }
             catch (Exception ex)
@@ -171,7 +169,7 @@ namespace EMGLib
                 Console.WriteLine("EMG Streamer, Directory Exception - " + ex.Message.ToString());
             }
 
-            emgSW = new StreamWriter(Path.Combine(save_path, filename));
+            emgSW = new StreamWriter(Path.Combine(saveDir, filename));
             string emgLog_label = "EMG1";
             for (int i = 1; i < numberOfChannels; i++)
             {
@@ -182,7 +180,7 @@ namespace EMGLib
             emgSW.Flush();
             // timestamp log file could be used for easier interpolation of timestamps if needed
             // (since there are repeats of the same timestamp for about 25 samples)
-            emgTimestampSW = new StreamWriter(Path.Combine(save_path, stamp_filename));
+            emgTimestampSW = new StreamWriter(Path.Combine(saveDir, stamp_filename));
             emgTimestampSW.WriteLine("Timestamp of EMG bytes retrieved");
             emgTimestampSW.Flush();
 
@@ -249,30 +247,26 @@ namespace EMGLib
         }
 
         // TO DO: change the following method to filter and log filtered and algo related info
-        public void filtEMGstream(CancellationToken token)
+        public void filtEMGstream(CancellationToken token, string saveDir)
         {
             string filename;
             string stamp_filename;
             if (calibrationOn)
             {
-                filename = currPart + "_filtEMGData_" + file_extension;
-                //string filenameFilt = @"\FilteredFormattedEMGData_" + file_extension;
-                stamp_filename = currPart + "_TimestampFilt_" + file_extension;
-                emgFiltSW = new StreamWriter(save_path + filename);
+                filename = currPart + "_FiltEMGData_" + file_extension;
+                emgFiltSW = new StreamWriter(Path.Combine(saveDir, filename));
                 emgFiltSW.WriteLine(string.Join(",", "emg channel", "filt signal", "signal timstamp"));
                 emgFiltSW.Flush();
 
             }
             else
             {
-                filename = @"\StimEMGData_" + file_extension;
-                //string filenameFilt = @"\FilteredFormattedEMGData_" + file_extension;
-                stamp_filename = @"\StimTimestamp_" + file_extension;
-                emgFiltSW = new StreamWriter(save_path + filename);
+                filename = currPart + "_FiltEMGData_" + file_extension;
+                emgFiltSW = new StreamWriter(Path.Combine(saveDir, filename));
                 emgFiltSW.WriteLine(string.Join(",", "emg channel", "filt signal", "signal timstamp"));
                 emgFiltSW.Flush();
-                filename = @"\EnvData_" + file_extension;
-                emgEnvelopedSW = new StreamWriter(save_path + filename);
+                filename = currPart + "_EnvData_" + file_extension;
+                emgEnvelopedSW = new StreamWriter(Path.Combine(saveDir, filename));
                 emgEnvelopedSW.WriteLine(string.Join(",", "emg channel", "enveloped signal", "start stim", "stim command", "movement detected", "movement detected timestamp", "percent", "threshold"));
                 emgEnvelopedSW.Flush();
             }
